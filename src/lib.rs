@@ -14,12 +14,11 @@ use {
         digest::Digest,
         eyre::{bail, Result, WrapErr},
         git2::{ErrorCode, Repository, RepositoryInitOptions, Signature, Time},
+        rayon::prelude::*,
         std::{env, fs, process::Command},
         tracing::{debug, info, trace, warn},
     },
 };
-
-pub mod git;
 
 /// Would you like to SAVE the change?
 ///
@@ -201,7 +200,7 @@ pub fn main(args: Args) -> Result<()> {
     let trace_generation = debug_span!("Finding generation index...");
     let generation_index = head
         .as_ref()
-        .map(|commit| git::find_generation_index(commit) + 1)
+        .map(|commit| find_generation_index(commit) + 1)
         .unwrap_or(0);
     drop(trace_generation);
 
@@ -273,31 +272,63 @@ pub fn main(args: Args) -> Result<()> {
 
     let trace_brute = debug_span!("Finding the most tree-like commit hash within step...");
 
-    // TODO: Do this ourselves, and make it parallel.
-    let (_score, author_timestamp, commit_timestamp) =
-        ((min_timestamp..=max_timestamp).map(|author_timestamp| {
+    let base_commit = repo
+        .commit_create_buffer(
+            &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
+            &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
+            &message,
+            &tree,
+            parents,
+        )
+        .unwrap()
+        .to_vec();
+    let base_commit = std::str::from_utf8(&base_commit)
+        .wrap_err("commit must be valid utf-8")
+        .unwrap();
+    let base_commit_lines = base_commit.split('\n').collect::<Vec<&str>>();
+    let author_line_index = base_commit_lines
+        .iter()
+        .position(|line| line.starts_with("author "))
+        .unwrap();
+    let author_line_pieces = &base_commit_lines[author_line_index]
+        .split(' ')
+        .collect::<Vec<_>>();
+    let committer_line_index = base_commit_lines
+        .iter()
+        .position(|line| line.starts_with("committer "))
+        .unwrap();
+    let committer_line_pieces = &base_commit_lines[committer_line_index]
+        .split(' ')
+        .collect::<Vec<_>>();
+
+    let commit_create_buffer = |author_timestamp: i64, committer_timestamp: i64| {
+        let mut commit_lines = base_commit_lines.clone();
+
+        let mut author_line_pieces = author_line_pieces.clone();
+        let i = author_line_pieces.len() - 2;
+        let author_timestamp = author_timestamp.to_string();
+        author_line_pieces[i] = &author_timestamp;
+        let author_line = author_line_pieces.join(" ");
+        commit_lines[author_line_index] = &author_line;
+
+        let mut committer_line_pieces = committer_line_pieces.clone();
+        let i = committer_line_pieces.len() - 2;
+        let committer_timestamp = committer_timestamp.to_string();
+        committer_line_pieces[i] = &committer_timestamp;
+        let committer_line = committer_line_pieces.join(" ");
+        commit_lines[committer_line_index] = &committer_line;
+
+        commit_lines.join("\n")
+    };
+
+    let (_score, author_timestamp, commit_timestamp, hash, candidate) = ((min_timestamp
+        ..=max_timestamp)
+        .into_par_iter()
+        .map(|author_timestamp| {
             (author_timestamp..=max_timestamp)
+                .into_par_iter()
                 .map(|commit_timestamp| {
-                    let candidate = repo
-                        .commit_create_buffer(
-                            &Signature::new(
-                                &user_name,
-                                &user_email,
-                                &Time::new(author_timestamp, offset),
-                            )
-                            .unwrap(),
-                            &Signature::new(
-                                &user_name,
-                                &user_email,
-                                &Time::new(commit_timestamp, offset),
-                            )
-                            .unwrap(),
-                            &message,
-                            &tree,
-                            parents,
-                        )
-                        .unwrap()
-                        .to_vec();
+                    let candidate = commit_create_buffer(author_timestamp, commit_timestamp);
                     let hash = sha1::Sha1::new()
                         .chain_update(format!("commit {}", candidate.len()))
                         .chain_update([0x00])
@@ -311,13 +342,13 @@ pub fn main(args: Args) -> Result<()> {
                         .map(|(a, b)| (a ^ b))
                         .collect::<Vec<u8>>();
 
-                    (score, author_timestamp, commit_timestamp)
+                    (score, author_timestamp, commit_timestamp, hash, candidate)
                 })
                 .min()
                 .unwrap()
         }))
-        .min()
-        .unwrap();
+    .min()
+    .unwrap();
     drop(trace_brute);
 
     if !args.dry_run {
@@ -340,7 +371,14 @@ pub fn main(args: Args) -> Result<()> {
             parents,
         )?;
     } else {
-        info!("Skipping commit write because this is a dry run.");
+        info!(
+            "Skipping commit write because this is a dry run:\n\ncommit {}\n{}",
+            hash.iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(""),
+            candidate
+        );
     }
 
     eprintln!();
@@ -397,7 +435,6 @@ pub fn init() -> Args {
         tracing_subscriber::fmt()
             .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
             .with_target(false)
-            .without_time()
             .with_span_events(
                 tracing_subscriber::fmt::format::FmtSpan::NEW
                     | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
@@ -406,4 +443,36 @@ pub fn init() -> Args {
     ));
 
     args
+}
+
+/// The generation index is the number of edges of the longest path between the
+/// given commit and an initial commit (one with no parents, which has an
+/// implicit generation index of 0).
+pub fn find_generation_index(commit: &git2::Commit) -> u32 {
+    let mut generation_index = 0;
+    let mut commits = vec![commit.clone()];
+
+    // naive solution: walk the entire graph depth-first.
+    // this could be pathological with a lot of branches.
+    // we could use a smarter algorithm, and/or if we come
+    // across a commit whose message matches the expected
+    // format and tree hash, we trust that it's accurate.
+    // however, that could be honestly mangled by a rebase
+    // or something, so it might not do.
+    loop {
+        let mut next_generation_commits = vec![];
+        for commit in commits.iter() {
+            next_generation_commits.extend(commit.parents());
+        }
+
+        if next_generation_commits.is_empty() {
+            break;
+        } else {
+            generation_index += 1;
+            commits = next_generation_commits;
+            continue;
+        }
+    }
+
+    generation_index
 }
