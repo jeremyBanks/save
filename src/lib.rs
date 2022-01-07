@@ -8,7 +8,8 @@
 )]
 
 use {
-    tracing::debug_span,
+    git2::Commit,
+    tracing::{debug_span, instrument},
     ::{
         clap::Parser,
         digest::Digest,
@@ -200,7 +201,7 @@ pub fn main(args: Args) -> Result<()> {
     let trace_generation = debug_span!("Finding generation index...");
     let generation_index = head
         .as_ref()
-        .map(|commit| find_generation_index(&repo, commit) + 1)
+        .map(|commit| find_generation_index(commit) + 1)
         .unwrap_or(0);
     drop(trace_generation);
 
@@ -270,8 +271,6 @@ pub fn main(args: Args) -> Result<()> {
         .unwrap_or_default();
     target_hash.append(&mut tree.id().as_bytes().to_vec());
 
-    let trace_brute = debug_span!("Finding the most tree-like commit hash within step...");
-
     let base_commit = repo
         .commit_create_buffer(
             &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
@@ -285,6 +284,113 @@ pub fn main(args: Args) -> Result<()> {
     let base_commit = std::str::from_utf8(&base_commit)
         .wrap_err("commit must be valid utf-8")
         .unwrap();
+
+    let (author_timestamp, commit_timestamp, brute_hash, commit_buffer) =
+        brute_commit(base_commit, &target_hash, min_timestamp, max_timestamp);
+
+    if !args.dry_run {
+        repo.commit(
+            Some("HEAD"),
+            &Signature::new(
+                &user_name,
+                &user_email,
+                &Time::new(author_timestamp, offset),
+            )
+            .unwrap(),
+            &Signature::new(
+                &user_name,
+                &user_email,
+                &Time::new(commit_timestamp, offset),
+            )
+            .unwrap(),
+            &message,
+            &tree,
+            parents,
+        )?;
+    } else {
+        info!(
+            "Skipping commit write because this is a dry run:\n\ncommit {}\n{}",
+            brute_hash
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(""),
+            commit_buffer
+        );
+    }
+
+    eprintln!();
+
+    Command::new("git")
+        .args(&[
+            "--no-pager",
+            "log",
+            "--name-status",
+            "--format=raw",
+            "--graph",
+            "--decorate",
+            "-n",
+            "2",
+        ])
+        .status()?;
+
+    eprintln!();
+
+    Ok(())
+}
+
+/// Initialize the typical global environment and parses the typical [Args] for
+/// save's [main] CLI entry point.
+///
+/// # Panics
+///
+/// This will panic if called multiple times, or if other code attempts
+/// conflicting global initialization of systems such as logging.
+pub fn init() -> Args {
+    color_eyre::install().unwrap();
+
+    let args = Args::parse();
+
+    let default_verbosity = 3;
+
+    let log_env = env::var("RUST_LOG").unwrap_or_default();
+
+    let log_level = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
+        log_env
+    } else {
+        match default_verbosity + args.verbose - args.quiet {
+            i32::MIN..=0 => "off".into(),
+            1 => "error".into(),
+            2 => "warn".into(),
+            3 => "info".into(),
+            4 => "debug".into(),
+            5..=i32::MAX => "trace".into(),
+        }
+    };
+
+    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
+        tracing_error::ErrorLayer::default(),
+        tracing_subscriber::fmt()
+            .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
+            .with_target(false)
+            .with_span_events(
+                tracing_subscriber::fmt::format::FmtSpan::NEW
+                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+            )
+            .pretty()
+            .finish(),
+    ));
+
+    args
+}
+
+#[instrument]
+pub fn brute_commit(
+    base_commit: &str,
+    target_hash: &[u8],
+    min_timestamp: i64,
+    max_timestamp: i64,
+) -> (i64, i64, Vec<u8>, String) {
     let base_commit_lines = base_commit.split('\n').collect::<Vec<&str>>();
     let author_line_index = base_commit_lines
         .iter()
@@ -349,100 +455,8 @@ pub fn main(args: Args) -> Result<()> {
         }))
     .min()
     .unwrap();
-    drop(trace_brute);
 
-    if !args.dry_run {
-        repo.commit(
-            Some("HEAD"),
-            &Signature::new(
-                &user_name,
-                &user_email,
-                &Time::new(author_timestamp, offset),
-            )
-            .unwrap(),
-            &Signature::new(
-                &user_name,
-                &user_email,
-                &Time::new(commit_timestamp, offset),
-            )
-            .unwrap(),
-            &message,
-            &tree,
-            parents,
-        )?;
-    } else {
-        info!(
-            "Skipping commit write because this is a dry run:\n\ncommit {}\n{}",
-            hash.iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<_>>()
-                .join(""),
-            candidate
-        );
-    }
-
-    eprintln!();
-
-    Command::new("git")
-        .args(&[
-            "--no-pager",
-            "log",
-            "--name-status",
-            "--format=raw",
-            "--graph",
-            "--decorate",
-            "-n",
-            "2",
-        ])
-        .status()?;
-
-    eprintln!();
-
-    Ok(())
-}
-
-/// Initialize the typical global environment and parses the typical [Args] for
-/// save's [main] CLI entry point.
-///
-/// # Panics
-///
-/// This will panic if called multiple times, or if other code attempts
-/// conflicting global initialization of systems such as logging.
-pub fn init() -> Args {
-    color_eyre::install().unwrap();
-
-    let args = Args::parse();
-
-    let default_verbosity = 3;
-
-    let log_env = env::var("RUST_LOG").unwrap_or_default();
-
-    let log_level = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
-        log_env
-    } else {
-        match default_verbosity + args.verbose - args.quiet {
-            i32::MIN..=0 => "off".into(),
-            1 => "error".into(),
-            2 => "warn".into(),
-            3 => "info".into(),
-            4 => "debug".into(),
-            5..=i32::MAX => "trace".into(),
-        }
-    };
-
-    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
-        tracing_error::ErrorLayer::default(),
-        tracing_subscriber::fmt()
-            .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
-            .with_target(false)
-            .with_span_events(
-                tracing_subscriber::fmt::format::FmtSpan::NEW
-                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-            )
-            .finish(),
-    ));
-
-    args
+    (author_timestamp, commit_timestamp, hash, candidate)
 }
 
 /// Finds the generation index of a given Git commit.
@@ -450,12 +464,48 @@ pub fn init() -> Args {
 /// The generation index is the number of edges of the longest path between the
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0).
-pub fn find_generation_index(_repo: &git2::Repository, commit: &git2::Commit) -> u32 {
+#[instrument]
+pub fn find_generation_index(commit: &Commit) -> u32 {
+    let _head = commit.clone();
+
+    struct LivePath {}
+
+    // let mut live_paths = vec![];
+
+    // let mut partial_paths = VecDeque::from([Vec::from([Commit::clone(&head)])]);
+    // let mut longest_full_path: Option<Vec<Commit>> = None;
+
+    // let _longest_path_to_commit = HashMap::<Oid, usize>::new();
+    // // requires that we're going depth-first, or it won't be populated in time.
+    // let _longest_path_to_commit_from_a_root = HashMap::<Oid, usize>::new();
+
+    // while !partial_paths.is_empty() {
+    //     let path = partial_paths.pop_back().unwrap();
+    //     let head = path.last().unwrap();
+
+    //     // we have found a root!
+    //     if head.parents().len() == 0 {
+    //         if path.len()
+    //             > longest_full_path
+    //                 .as_ref()
+    //                 .map(|v| v.len())
+    //                 .unwrap_or_default()
+    //         {
+    //             longest_full_path = Some(path.clone());
+    //         } else {
+    //             for parent in head.parents() {
+    //                 let mut new_path: Vec<Commit> = vec![];
+    //                 new_path.extend(path.iter().cloned());
+    //                 new_path.push(parent.clone());
+    //                 partial_paths.push_back(new_path);
+    //             }
+    //         }
+    //     }
+    // }
+
     let mut generation_index = 0;
     let mut commits = vec![commit.clone()];
 
-    // This is pathologically slow on non-tiny repositories.
-    // TODO: make it bette
     loop {
         let mut next_generation_commits = vec![];
         for commit in commits.iter() {
