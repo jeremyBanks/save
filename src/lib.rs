@@ -200,7 +200,7 @@ pub fn main(args: Args) -> Result<()> {
     let trace_generation = debug_span!("Finding generation index...");
     let generation_index = head
         .as_ref()
-        .map(|commit| find_generation_index(commit) + 1)
+        .map(|commit| find_generation_index(&repo, commit) + 1)
         .unwrap_or(0);
     drop(trace_generation);
 
@@ -445,20 +445,17 @@ pub fn init() -> Args {
     args
 }
 
+/// Finds the generation index of a given Git commit.
+///
 /// The generation index is the number of edges of the longest path between the
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0).
-pub fn find_generation_index(commit: &git2::Commit) -> u32 {
+pub fn find_generation_index(_repo: &git2::Repository, commit: &git2::Commit) -> u32 {
     let mut generation_index = 0;
     let mut commits = vec![commit.clone()];
 
-    // naive solution: walk the entire graph depth-first.
-    // this could be pathological with a lot of branches.
-    // we could use a smarter algorithm, and/or if we come
-    // across a commit whose message matches the expected
-    // format and tree hash, we trust that it's accurate.
-    // however, that could be honestly mangled by a rebase
-    // or something, so it might not do.
+    // This is pathologically slow on non-tiny repositories.
+    // TODO: make it bette
     loop {
         let mut next_generation_commits = vec![];
         for commit in commits.iter() {
