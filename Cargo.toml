@@ -1,0 +1,55 @@
+[package]
+authors = ["Jeremy Banks <_@jeremy.ca>"]
+description = "Would you like to SAVE the change?"
+edition = "2021"
+include = ["/src/**.rs", "/*.toml", "/*.md"]
+license = "MIT OR Apache-2.0"
+name = "save"
+repository = "https://github.com/jeremyBanks/save"
+resolver = "2"
+version = "0.2.2"
+
+[dependencies.clap]
+features = ["derive", "env", "cargo", "unicode", "wrap_help"]
+version = "3.0.4"
+
+[dependencies.color-eyre]
+version = "0.5.11"
+
+[dependencies.digest]
+version = "0.10.1"
+
+[dependencies.eyre]
+version = "0.6.5"
+
+[dependencies.git2]
+version = "0.13.25"
+
+[dependencies.hex]
+version = "0.4.3"
+
+[dependencies.home]
+version = "0.5.3"
+
+[dependencies.rayon]
+version = "1.5.1"
+
+[dependencies.remain]
+version = "0.2.2"
+
+[dependencies.sha-1]
+version = "0.10.0"
+
+[dependencies.tracing]
+features = ["log"]
+version = "0.1.29"
+
+[dependencies.tracing-error]
+features = ["traced-error"]
+version = "0.1.2"
+
+[dependencies.tracing-log]
+version = "0.1.2"
+
+[dependencies.tracing-subscriber]
+version = "0.2.5"
