@@ -8,13 +8,9 @@
 
 use {
     git2::{Commit, Oid},
-    std::{
-        cell::RefCell,
-        collections::HashMap,
-        rc::{Rc, Weak},
-    },
+    std::{cell::RefCell, cmp::max, collections::HashMap, rc::Rc},
     thousands::Separable,
-    tracing::{debug_span, error, instrument},
+    tracing::{debug_span, instrument},
     ::{
         clap::Parser,
         digest::Digest,
@@ -427,20 +423,22 @@ pub fn brute_commit(
 pub fn find_generation_index(commit: &Commit) -> u32 {
     let head = commit.clone();
 
-    // 1. Walk the entire Git ancestry graph starting from HEAD to load
-    //    the graph structure into memory.
     #[derive(Debug, Clone)]
     struct CommitNode {
-        edges_in: Vec<Weak<RefCell<CommitNode>>>,
+        // number of edges (git children) whose distances hasn't been accounted-for yet
+        unaccounted_edges_in: u32,
+        // max distance from head of accounted-for edges
+        max_distance_from_head: u32,
+        // git parents of this node
         edges_out: Vec<Rc<RefCell<CommitNode>>>,
     }
 
-    let (root, leaves) = {
-        let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
-        let mut initial_commits = vec![];
-
+    let (root, _leaves) = {
         let span = debug_span!("load_git_graph");
         let _guard = span.enter();
+
+        let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
+        let mut initial_commits = vec![];
 
         #[derive(Debug, Clone)]
         struct CommitWalking<'repo> {
@@ -460,13 +458,14 @@ pub fn find_generation_index(commit: &Commit) -> u32 {
                 .and_modify(|node| {
                     if let Some(from) = from {
                         from.borrow_mut().edges_out.push(node.clone());
-                        node.borrow_mut().edges_in.push(Rc::downgrade(from));
+                        node.borrow_mut().unaccounted_edges_in += 1;
                     }
                 })
                 .or_insert_with(|| {
                     let node = Rc::new(RefCell::new(CommitNode {
-                        edges_in: from.iter().map(Rc::downgrade).collect(),
                         edges_out: vec![],
+                        unaccounted_edges_in: 1,
+                        max_distance_from_head: 0,
                     }));
 
                     if let Some(from) = from {
@@ -490,22 +489,48 @@ pub fn find_generation_index(commit: &Commit) -> u32 {
         }
 
         info!(
-            "Loaded {} commits",
-            all_commits.len().separate_with_underscores()
+            "Loaded {} commits, containing {} initial commits.",
+            all_commits.len().separate_with_underscores(),
+            initial_commits.len(),
         );
 
         let head = all_commits.get(&head.id()).unwrap().clone();
         (head, initial_commits)
     };
 
-    // Is this like a destructor stack overflow?
+    let generation_index = {
+        let span = debug_span!("measure_git_graph");
+        let _guard = span.enter();
 
-    error!("WHAT");
+        let mut generation_index = 0;
 
-    let _z = (root, leaves);
-    drop(_z);
+        let mut live = vec![root];
 
-    todo!("WHAT")
+        while let Some(commit) = live.pop() {
+            let commit = commit.borrow_mut();
+
+            if commit.edges_out.is_empty() {
+                generation_index = max(generation_index, commit.max_distance_from_head);
+            } else {
+                for parent in commit.edges_out.iter() {
+                    let mut parent_mut = parent.borrow_mut();
+                    parent_mut.max_distance_from_head = max(
+                        parent_mut.max_distance_from_head,
+                        commit.max_distance_from_head + 1,
+                    );
+                    parent_mut.unaccounted_edges_in -= 1;
+
+                    if parent_mut.unaccounted_edges_in == 0 {
+                        live.push(parent.clone());
+                    }
+                }
+            }
+        }
+
+        generation_index
+    };
+
+    generation_index
 }
 
 /// Initialize the typical global environment and parses the typical [Args] for
