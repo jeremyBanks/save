@@ -1,14 +1,15 @@
 #![doc = include_str!("../README.md")]
 #![warn(
     missing_docs,
-    clippy::missing_docs_in_private_items,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
     clippy::missing_safety_doc
 )]
 
 use {
-    git2::Commit,
+    git2::{Commit, Oid},
+    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    thousands::Separable,
     tracing::{debug_span, instrument},
     ::{
         clap::Parser,
@@ -16,7 +17,7 @@ use {
         eyre::{bail, Result, WrapErr},
         git2::{ErrorCode, Repository, RepositoryInitOptions, Signature, Time},
         rayon::prelude::*,
-        std::{env, fs, process::Command},
+        std::{env, fs},
         tracing::{debug, info, trace, warn},
     },
 };
@@ -86,9 +87,8 @@ pub struct Args {
 /// # Errors
 ///
 /// For other fatal errors.
+#[instrument(level = "debug")]
 pub fn main(args: Args) -> Result<()> {
-    trace!("{:#?}", args);
-
     let repo = match Repository::open_from_env() {
         Ok(repo) => {
             if repo.is_bare() {
@@ -198,12 +198,10 @@ pub fn main(args: Args) -> Result<()> {
         placeholder_email.to_string()
     };
 
-    let trace_generation = debug_span!("Finding generation index...");
     let generation_index = head
         .as_ref()
         .map(|commit| find_generation_index(commit) + 1)
         .unwrap_or(0);
-    drop(trace_generation);
 
     let mut index = repo.index()?;
 
@@ -319,72 +317,29 @@ pub fn main(args: Args) -> Result<()> {
         );
     }
 
-    eprintln!();
+    // eprintln!();
 
-    Command::new("git")
-        .args(&[
-            "--no-pager",
-            "log",
-            "--name-status",
-            "--format=raw",
-            "--graph",
-            "--decorate",
-            "-n",
-            "2",
-        ])
-        .status()?;
+    // Command::new("git")
+    //     .args(&[
+    //         "--no-pager",
+    //         "log",
+    //         "--name-status",
+    //         "--format=raw",
+    //         "--graph",
+    //         "--decorate",
+    //         "-n",
+    //         "2",
+    //     ])
+    //     .status()?;
 
-    eprintln!();
+    // eprintln!();
 
     Ok(())
 }
 
-/// Initialize the typical global environment and parses the typical [Args] for
-/// save's [main] CLI entry point.
-///
-/// # Panics
-///
-/// This will panic if called multiple times, or if other code attempts
-/// conflicting global initialization of systems such as logging.
-pub fn init() -> Args {
-    color_eyre::install().unwrap();
-
-    let args = Args::parse();
-
-    let default_verbosity = 3;
-
-    let log_env = env::var("RUST_LOG").unwrap_or_default();
-
-    let log_level = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
-        log_env
-    } else {
-        match default_verbosity + args.verbose - args.quiet {
-            i32::MIN..=0 => "off".into(),
-            1 => "error".into(),
-            2 => "warn".into(),
-            3 => "info".into(),
-            4 => "debug".into(),
-            5..=i32::MAX => "trace".into(),
-        }
-    };
-
-    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
-        tracing_error::ErrorLayer::default(),
-        tracing_subscriber::fmt()
-            .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
-            .with_target(false)
-            .with_span_events(
-                tracing_subscriber::fmt::format::FmtSpan::NEW
-                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-            )
-            .pretty()
-            .finish(),
-    ));
-
-    args
-}
-
-#[instrument]
+/// Given a raw Git commit as a string, find the timestamps that will produce
+/// the closest commit ID to target_hash.
+#[instrument(level = "debug")]
 pub fn brute_commit(
     base_commit: &str,
     target_hash: &[u8],
@@ -464,62 +419,115 @@ pub fn brute_commit(
 /// The generation index is the number of edges of the longest path between the
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0).
-#[instrument]
+#[instrument(level = "debug")]
 pub fn find_generation_index(commit: &Commit) -> u32 {
-    let _head = commit.clone();
+    let commit = commit.clone();
 
-    struct LivePath {}
+    // 1. Walk the entire Git ancestry graph starting from HEAD to load
+    //    the graph structure into memory.
+    #[derive(Debug, Clone)]
+    struct CommitNode {
+        id: Oid,
+        edges_in: Vec<Rc<RefCell<CommitNode>>>,
+        edges_out: Vec<Rc<RefCell<CommitNode>>>,
+    }
 
-    // let mut live_paths = vec![];
+    let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
 
-    // let mut partial_paths = VecDeque::from([Vec::from([Commit::clone(&head)])]);
-    // let mut longest_full_path: Option<Vec<Commit>> = None;
+    {
+        let span = debug_span!("load_git_graph");
+        let _guard = span.enter();
 
-    // let _longest_path_to_commit = HashMap::<Oid, usize>::new();
-    // // requires that we're going depth-first, or it won't be populated in time.
-    // let _longest_path_to_commit_from_a_root = HashMap::<Oid, usize>::new();
-
-    // while !partial_paths.is_empty() {
-    //     let path = partial_paths.pop_back().unwrap();
-    //     let head = path.last().unwrap();
-
-    //     // we have found a root!
-    //     if head.parents().len() == 0 {
-    //         if path.len()
-    //             > longest_full_path
-    //                 .as_ref()
-    //                 .map(|v| v.len())
-    //                 .unwrap_or_default()
-    //         {
-    //             longest_full_path = Some(path.clone());
-    //         } else {
-    //             for parent in head.parents() {
-    //                 let mut new_path: Vec<Commit> = vec![];
-    //                 new_path.extend(path.iter().cloned());
-    //                 new_path.push(parent.clone());
-    //                 partial_paths.push_back(new_path);
-    //             }
-    //         }
-    //     }
-    // }
-
-    let mut generation_index = 0;
-    let mut commits = vec![commit.clone()];
-
-    loop {
-        let mut next_generation_commits = vec![];
-        for commit in commits.iter() {
-            next_generation_commits.extend(commit.parents());
+        #[derive(Debug, Clone)]
+        struct CommitWalking<'repo> {
+            commit: Commit<'repo>,
+            from: Option<Rc<RefCell<CommitNode>>>,
         }
 
-        if next_generation_commits.is_empty() {
-            break;
-        } else {
-            generation_index += 1;
-            commits = next_generation_commits;
-            continue;
+        let mut walks = vec![CommitWalking { commit, from: None }];
+
+        while let Some(CommitWalking { commit, from }) = walks.pop() {
+            let from = &from;
+            all_commits
+                .entry(commit.id())
+                .and_modify(|working| {
+                    if let Some(from) = from {
+                        let mut working = working.borrow_mut();
+                        working.edges_in.push(from.clone());
+                    }
+                })
+                .or_insert_with(|| {
+                    let new_node = Rc::new(RefCell::new(CommitNode {
+                        id: commit.id(),
+                        edges_in: from.clone().into_iter().collect(),
+                        edges_out: vec![],
+                    }));
+
+                    for parent in commit.parents() {
+                        walks.push(CommitWalking {
+                            commit: parent,
+                            from: Some(new_node.clone()),
+                        });
+                    }
+
+                    if commit.parents().len() == 0 {
+                        debug!("Found an initial commit: {:?}", commit);
+                    }
+
+                    new_node
+                });
         }
     }
 
-    generation_index
+    info!(
+        "Loaded {} commits.",
+        all_commits.len().separate_with_underscores()
+    );
+
+    all_commits.len().try_into().unwrap()
+}
+
+/// Initialize the typical global environment and parses the typical [Args] for
+/// save's [main] CLI entry point.
+///
+/// # Panics
+///
+/// This will panic if called multiple times, or if other code attempts
+/// conflicting global initialization of systems such as logging.
+pub fn init() -> Args {
+    color_eyre::install().unwrap();
+
+    let args = Args::parse();
+
+    let default_verbosity = 3;
+
+    let log_env = env::var("RUST_LOG").unwrap_or_default();
+
+    let log_level = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
+        log_env
+    } else {
+        match default_verbosity + args.verbose - args.quiet {
+            i32::MIN..=0 => "off".into(),
+            1 => "error".into(),
+            2 => "warn".into(),
+            3 => "info".into(),
+            4 => "debug".into(),
+            5..=i32::MAX => "trace".into(),
+        }
+    };
+
+    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
+        tracing_error::ErrorLayer::default(),
+        tracing_subscriber::fmt()
+            .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
+            .with_target(false)
+            .with_span_events(
+                tracing_subscriber::fmt::format::FmtSpan::ENTER
+                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+            )
+            .compact()
+            .finish(),
+    ));
+
+    args
 }
