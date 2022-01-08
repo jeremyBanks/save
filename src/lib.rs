@@ -8,9 +8,13 @@
 
 use {
     git2::{Commit, Oid},
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    std::{
+        cell::RefCell,
+        collections::HashMap,
+        rc::{Rc, Weak},
+    },
     thousands::Separable,
-    tracing::{debug_span, instrument},
+    tracing::{debug_span, error, instrument},
     ::{
         clap::Parser,
         digest::Digest,
@@ -421,20 +425,20 @@ pub fn brute_commit(
 /// implicit generation index of 0).
 #[instrument(level = "debug")]
 pub fn find_generation_index(commit: &Commit) -> u32 {
-    let commit = commit.clone();
+    let head = commit.clone();
 
     // 1. Walk the entire Git ancestry graph starting from HEAD to load
     //    the graph structure into memory.
     #[derive(Debug, Clone)]
     struct CommitNode {
-        id: Oid,
-        edges_in: Vec<Rc<RefCell<CommitNode>>>,
+        edges_in: Vec<Weak<RefCell<CommitNode>>>,
         edges_out: Vec<Rc<RefCell<CommitNode>>>,
     }
 
-    let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
+    let (root, leaves) = {
+        let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
+        let mut initial_commits = vec![];
 
-    {
         let span = debug_span!("load_git_graph");
         let _guard = span.enter();
 
@@ -444,47 +448,64 @@ pub fn find_generation_index(commit: &Commit) -> u32 {
             from: Option<Rc<RefCell<CommitNode>>>,
         }
 
-        let mut walks = vec![CommitWalking { commit, from: None }];
+        let mut walks = vec![CommitWalking {
+            commit: head.clone(),
+            from: None,
+        }];
 
         while let Some(CommitWalking { commit, from }) = walks.pop() {
             let from = &from;
             all_commits
                 .entry(commit.id())
-                .and_modify(|working| {
+                .and_modify(|node| {
                     if let Some(from) = from {
-                        let mut working = working.borrow_mut();
-                        working.edges_in.push(from.clone());
+                        from.borrow_mut().edges_out.push(node.clone());
+                        node.borrow_mut().edges_in.push(Rc::downgrade(from));
                     }
                 })
                 .or_insert_with(|| {
-                    let new_node = Rc::new(RefCell::new(CommitNode {
-                        id: commit.id(),
-                        edges_in: from.clone().into_iter().collect(),
+                    let node = Rc::new(RefCell::new(CommitNode {
+                        edges_in: from.iter().map(Rc::downgrade).collect(),
                         edges_out: vec![],
                     }));
 
-                    for parent in commit.parents() {
-                        walks.push(CommitWalking {
-                            commit: parent,
-                            from: Some(new_node.clone()),
-                        });
+                    if let Some(from) = from {
+                        from.borrow_mut().edges_out.push(node.clone());
                     }
 
                     if commit.parents().len() == 0 {
                         debug!("Found an initial commit: {:?}", commit);
+                        initial_commits.push(node.clone());
+                    } else {
+                        for parent in commit.parents() {
+                            walks.push(CommitWalking {
+                                commit: parent,
+                                from: Some(node.clone()),
+                            });
+                        }
                     }
 
-                    new_node
+                    node
                 });
         }
-    }
 
-    info!(
-        "Loaded {} commits.",
-        all_commits.len().separate_with_underscores()
-    );
+        info!(
+            "Loaded {} commits",
+            all_commits.len().separate_with_underscores()
+        );
 
-    all_commits.len().try_into().unwrap()
+        let head = all_commits.get(&head.id()).unwrap().clone();
+        (head, initial_commits)
+    };
+
+    // Is this like a destructor stack overflow?
+
+    error!("WHAT");
+
+    let _z = (root, leaves);
+    drop(_z);
+
+    todo!("WHAT")
 }
 
 /// Initialize the typical global environment and parses the typical [Args] for
