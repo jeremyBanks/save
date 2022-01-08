@@ -7,10 +7,11 @@ license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
 resolver = "2"
-version = "0.2.4"
+version = "0.2.5-dev"
 
 [package.metadata.release]
 allow-branch = ["trunk"]
+dev-version = true
 dev-version-ext = "dev"
 post-release-commit-message = "start v{{next_version}}"
 pre-release-commit-message = "release v{{version}}"
