@@ -8,7 +8,7 @@
 
 use {
     git2::{Commit, Oid},
-    std::{cell::RefCell, cmp::max, collections::HashMap, rc::Rc},
+    std::{cell::RefCell, cmp::max, collections::HashMap, process::Command, rc::Rc},
     thousands::Separable,
     tracing::{debug_span, instrument},
     ::{
@@ -317,22 +317,22 @@ pub fn main(args: Args) -> Result<()> {
         );
     }
 
-    // eprintln!();
+    eprintln!();
 
-    // Command::new("git")
-    //     .args(&[
-    //         "--no-pager",
-    //         "log",
-    //         "--name-status",
-    //         "--format=raw",
-    //         "--graph",
-    //         "--decorate",
-    //         "-n",
-    //         "2",
-    //     ])
-    //     .status()?;
+    Command::new("git")
+        .args(&[
+            "--no-pager",
+            "log",
+            "--name-status",
+            "--format=raw",
+            "--graph",
+            "--decorate",
+            "-n",
+            "2",
+        ])
+        .status()?;
 
-    // eprintln!();
+    eprintln!();
 
     Ok(())
 }
