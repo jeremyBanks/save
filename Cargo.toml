@@ -7,12 +7,15 @@ license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
 resolver = "2"
-version = "0.2.4"
+version = "0.2.4-dev"
 
-[dependencies]
-tinyvec = { version = "1.5.1", features = ["alloc"] }
-thousands = "0.2.0"
-crossbeam = "0.8.1"
+[package.metadata.release]
+allow-branch = ["trunk"]
+dev-version-ext = "dev"
+post-release-commit-message = "start v{{next_version}}"
+pre-release-commit-message = "release v{{version}}"
+tag-message = "{{crate_name}}@{{tag_name}}"
+tag-name = "{{version}}"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
@@ -47,6 +50,9 @@ version = "0.2.2"
 
 [dependencies.sha-1]
 version = "0.10.0"
+
+[dependencies.thousands]
+version = "0.2.0"
 
 [dependencies.tracing]
 features = ["log"]
