@@ -13,9 +13,9 @@ version = "0.2.6-dev"
 allow-branch = ["trunk"]
 dev-version = true
 dev-version-ext = "dev"
-post-release-commit-message = "start v{{next_version}}"
-pre-release-commit-message = "release v{{version}}"
-tag-message = "{{crate_name}}@{{tag_name}}"
+post-release-commit-message = "v{{next_version}}"
+pre-release-commit-message = "v{{version}}"
+tag-message = "https://crates.io/crates/{{crate_name}}/{{tag_name}}"
 tag-name = "{{version}}"
 
 [dependencies.clap]
