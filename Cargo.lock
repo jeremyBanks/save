@@ -788,7 +788,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "save"
-version = "0.3.0-dev"
+version = "0.3.0"
 dependencies = [
  "clap",
  "color-eyre",
