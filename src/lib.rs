@@ -8,7 +8,7 @@
 
 use {
     git2::{Commit, Oid},
-    std::{cell::RefCell, cmp::max, collections::HashMap, process::Command, rc::Rc},
+    std::{cell::RefCell, cmp::max, collections::HashMap, path::PathBuf, process::Command, rc::Rc},
     thousands::Separable,
     tracing::{debug_span, instrument},
     ::{
@@ -87,7 +87,7 @@ pub struct Args {
 /// # Errors
 ///
 /// For other fatal errors.
-#[instrument(level = "debug")]
+#[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
     let repo = match Repository::open_from_env() {
         Ok(repo) => {
@@ -116,6 +116,9 @@ pub fn main(args: Args) -> Result<()> {
                 bail!("Current directory is empty, skipping auto-init (-y/--yes to override).");
             } else {
                 info!("Initializing a new Git repository in: {:?}", path);
+                if args.dry_run {
+                    bail!("Can't initialize a new repository on a dry run.");
+                }
                 Repository::init_opts(
                     path,
                     RepositoryInitOptions::new()
@@ -205,8 +208,28 @@ pub fn main(args: Args) -> Result<()> {
 
     let mut index = repo.index()?;
 
-    index.add_all(["*"], Default::default(), Default::default())?;
     let tree = index.write_tree()?;
+    index
+        .add_all(
+            ["*"],
+            Default::default(),
+            Some(&mut |path, _| {
+                if path.to_string_lossy().ends_with('/') {
+                    let mut git_path = PathBuf::from(path);
+                    git_path.push(".git");
+                    if git_path.is_dir() {
+                        warn!(
+                            "Encountered a Git submodule; skipping it: {}",
+                            git_path.to_string_lossy()
+                        );
+                        return 1;
+                    }
+                }
+                trace!("Adding: {}", path.to_string_lossy());
+                0
+            }),
+        )
+        .wrap_err("Failed to add something to the Git index.")?;
 
     if let Some(ref head) = head {
         if tree == head.tree_id() {
@@ -574,6 +597,8 @@ pub fn init() -> Args {
             .compact()
             .finish(),
     ));
+
+    trace!("Initialized from {:#?}", args);
 
     args
 }
