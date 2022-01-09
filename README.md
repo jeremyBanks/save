@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.4.0
+$ cargo install save
 ```
 
 ```md
