@@ -450,6 +450,12 @@ pub fn brute_force_timestamps(
 pub fn generation_number(commit: &Commit) -> u32 {
     let head = commit.clone();
 
+    // TODO: make this better.
+    // maybe use libgit2's topological revwalk
+    // https://docs.rs/git2/latest/git2/struct.Revwalk.html
+    // or maybe see about exposing the generation number more directly
+    // https://github.com/libgit2/libgit2/pull/5766/files\
+
     #[derive(Debug, Clone)]
     struct CommitNode {
         // number of edges (git children) whose distances hasn't been accounted-for yet
