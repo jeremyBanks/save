@@ -30,7 +30,7 @@ use {
 #[remain::sorted]
 pub struct Args {
     /// Prepare the commit, but don't actually save anything to disk.
-    #[clap(long)]
+    #[clap(long, short = 'n')]
     pub dry_run: bool,
 
     /// The author email to use for the commit.
@@ -52,7 +52,7 @@ pub struct Args {
     /// The author name to use for the commit.
     ///
     /// [default: name from git, or else from parent commit, or else "save"]
-    #[clap(long, short = 'n')]
+    #[clap(long, short = 'a')]
     pub name: Option<String>,
 
     /// The time is NOW.
