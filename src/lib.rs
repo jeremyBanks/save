@@ -8,9 +8,8 @@
 
 use {
     git2::{Commit, Oid},
-    std::{cell::RefCell, cmp::max, collections::HashMap, path::PathBuf, process::Command, rc::Rc},
-    thousands::Separable,
-    tracing::{debug_span, instrument},
+    std::{cmp::max, collections::HashMap, path::PathBuf, process::Command},
+    tracing::instrument,
     ::{
         clap::Parser,
         digest::Digest,
@@ -203,7 +202,7 @@ pub fn main(args: Args) -> Result<()> {
 
     let generation_number = head
         .as_ref()
-        .map(|commit| generation_number(commit) + 1)
+        .map(|commit| generation_number(&repo, commit).unwrap() + 1)
         .unwrap_or(0);
 
     let mut index = repo.index()?;
@@ -446,124 +445,31 @@ pub fn brute_force_timestamps(
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0). The Git documentation also refers to this
 /// as the "topological level" of a commit (https://git-scm.com/docs/commit-graph).
-#[instrument(level = "debug")]
-pub fn generation_number(commit: &Commit) -> u32 {
-    let head = commit.clone();
+#[instrument(level = "debug", skip(repo))]
+pub fn generation_number(repo: &Repository, commit: &Commit) -> Result<u32> {
+    let mut walker = repo.revwalk()?;
+    walker.push(commit.id())?;
+    // from initial commits up to the head
+    walker.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::REVERSE)?;
 
-    // TODO: make this better.
-    // maybe use libgit2's topological revwalk
-    // https://docs.rs/git2/latest/git2/struct.Revwalk.html
-    // or maybe see about exposing the generation number more directly
-    // https://github.com/libgit2/libgit2/pull/5766/files\
+    let mut generation_of_oid = HashMap::<Oid, u32>::new();
+    let mut generation_number = 0;
 
-    #[derive(Debug, Clone)]
-    struct CommitNode {
-        // number of edges (git children) whose distances hasn't been accounted-for yet
-        unaccounted_edges_in: u32,
-        // max distance from head of accounted-for edges
-        max_distance_from_head: u32,
-        // git parents of this node
-        edges_out: Vec<Rc<RefCell<CommitNode>>>,
+    for oid in walker {
+        let oid = oid?;
+        let commit = repo.find_commit(oid)?;
+        let mut generation = 0;
+        for parent in commit.parents() {
+            let parent_generation = generation_of_oid[&parent.id()];
+            generation = max(generation, parent_generation + 1);
+        }
+        generation_of_oid.insert(oid, generation);
+        generation_number = max(generation_number, generation);
     }
 
-    let (root, _leaves) = {
-        let span = debug_span!("load_git_graph");
-        let _guard = span.enter();
+    debug!("Generation number is: {}", generation_number);
 
-        let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
-        let mut initial_commits = vec![];
-
-        #[derive(Debug, Clone)]
-        struct CommitWalking<'repo> {
-            commit: Commit<'repo>,
-            from: Option<Rc<RefCell<CommitNode>>>,
-        }
-
-        let mut walks = vec![CommitWalking {
-            commit: head.clone(),
-            from: None,
-        }];
-
-        while let Some(CommitWalking { commit, from }) = walks.pop() {
-            let from = &from;
-            all_commits
-                .entry(commit.id())
-                .and_modify(|node| {
-                    if let Some(from) = from {
-                        from.borrow_mut().edges_out.push(node.clone());
-                        node.borrow_mut().unaccounted_edges_in += 1;
-                    }
-                })
-                .or_insert_with(|| {
-                    let node = Rc::new(RefCell::new(CommitNode {
-                        edges_out: vec![],
-                        unaccounted_edges_in: 1,
-                        max_distance_from_head: 0,
-                    }));
-
-                    if let Some(from) = from {
-                        from.borrow_mut().edges_out.push(node.clone());
-                    }
-
-                    if commit.parents().len() == 0 {
-                        debug!("Found an initial commit: {:?}", commit);
-                        initial_commits.push(node.clone());
-                    } else {
-                        for parent in commit.parents() {
-                            walks.push(CommitWalking {
-                                commit: parent,
-                                from: Some(node.clone()),
-                            });
-                        }
-                    }
-
-                    node
-                });
-        }
-
-        info!(
-            "Loaded {} commits, containing {} initial commits.",
-            all_commits.len().separate_with_underscores(),
-            initial_commits.len(),
-        );
-
-        let head = all_commits.get(&head.id()).unwrap().clone();
-        (head, initial_commits)
-    };
-
-    let generation_number = {
-        let span = debug_span!("measure_git_graph");
-        let _guard = span.enter();
-
-        let mut generation_number = 0;
-
-        let mut live = vec![root];
-
-        while let Some(commit) = live.pop() {
-            let commit = commit.borrow_mut();
-
-            if commit.edges_out.is_empty() {
-                generation_number = max(generation_number, commit.max_distance_from_head);
-            } else {
-                for parent in commit.edges_out.iter() {
-                    let mut parent_mut = parent.borrow_mut();
-                    parent_mut.max_distance_from_head = max(
-                        parent_mut.max_distance_from_head,
-                        commit.max_distance_from_head + 1,
-                    );
-                    parent_mut.unaccounted_edges_in -= 1;
-
-                    if parent_mut.unaccounted_edges_in == 0 {
-                        live.push(parent.clone());
-                    }
-                }
-            }
-        }
-
-        generation_number
-    };
-
-    generation_number
+    Ok(generation_number)
 }
 
 /// Initialize the typical global environment and parses the typical [Args] for
