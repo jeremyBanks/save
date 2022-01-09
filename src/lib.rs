@@ -203,12 +203,11 @@ pub fn main(args: Args) -> Result<()> {
 
     let generation_index = head
         .as_ref()
-        .map(|commit| find_generation_index(commit) + 1)
+        .map(|commit| generation_index(commit) + 1)
         .unwrap_or(0);
 
     let mut index = repo.index()?;
 
-    let tree = index.write_tree()?;
     index
         .add_all(
             ["*"],
@@ -230,6 +229,8 @@ pub fn main(args: Args) -> Result<()> {
             }),
         )
         .wrap_err("Failed to add something to the Git index.")?;
+
+    let tree = index.write_tree()?;
 
     if let Some(ref head) = head {
         if tree == head.tree_id() {
@@ -307,7 +308,7 @@ pub fn main(args: Args) -> Result<()> {
         .unwrap();
 
     let (author_timestamp, commit_timestamp, brute_hash, commit_buffer) =
-        brute_commit(base_commit, &target_hash, min_timestamp, max_timestamp);
+        brute_force_timestamps(base_commit, &target_hash, min_timestamp, max_timestamp);
 
     if !args.dry_run {
         repo.commit(
@@ -360,10 +361,12 @@ pub fn main(args: Args) -> Result<()> {
     Ok(())
 }
 
-/// Given a raw Git commit as a string, find the timestamps that will produce
-/// the closest commit ID to target_hash.
+/// Given a raw Git commit as a string, find the timestamps in the given range
+/// that will produce the closest commit ID to target_hash. We ensure that
+/// min_timestamp <= author_timestamp <= committer_timestamp <= max_timestamp
+/// because it would be weird to it committed before being authored.
 #[instrument(level = "debug")]
-pub fn brute_commit(
+pub fn brute_force_timestamps(
     base_commit: &str,
     target_hash: &[u8],
     min_timestamp: i64,
@@ -443,7 +446,7 @@ pub fn brute_commit(
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0).
 #[instrument(level = "debug")]
-pub fn find_generation_index(commit: &Commit) -> u32 {
+pub fn generation_index(commit: &Commit) -> u32 {
     let head = commit.clone();
 
     #[derive(Debug, Clone)]
