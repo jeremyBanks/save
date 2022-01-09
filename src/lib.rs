@@ -201,9 +201,9 @@ pub fn main(args: Args) -> Result<()> {
         placeholder_email.to_string()
     };
 
-    let generation_index = head
+    let generation_number = head
         .as_ref()
-        .map(|commit| generation_index(commit) + 1)
+        .map(|commit| generation_number(commit) + 1)
         .unwrap_or(0);
 
     let mut index = repo.index()?;
@@ -254,7 +254,7 @@ pub fn main(args: Args) -> Result<()> {
     let tree4 = &tree.to_string()[..4];
     let tree = repo.find_tree(tree)?;
 
-    let revision_index = generation_index + 1;
+    let revision_index = generation_number + 1;
     let message = args.message.unwrap_or_else(|| {
         let mut message = format!("r{}", revision_index);
         if let Some(ref head) = head {
@@ -307,7 +307,7 @@ pub fn main(args: Args) -> Result<()> {
         .wrap_err("commit must be valid utf-8")
         .unwrap();
 
-    let (author_timestamp, commit_timestamp, brute_hash, commit_buffer) =
+    let (author_timestamp, commit_timestamp) =
         brute_force_timestamps(base_commit, &target_hash, min_timestamp, max_timestamp);
 
     if !args.dry_run {
@@ -329,16 +329,6 @@ pub fn main(args: Args) -> Result<()> {
             &tree,
             parents,
         )?;
-    } else {
-        info!(
-            "Skipping commit write because this is a dry run:\n\ncommit {}\n{}",
-            brute_hash
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<_>>()
-                .join(""),
-            commit_buffer
-        );
     }
 
     eprintln!();
@@ -361,7 +351,9 @@ pub fn main(args: Args) -> Result<()> {
     Ok(())
 }
 
-/// Given a raw Git commit as a string, find the timestamps in the given range
+/// Brute forces timestamps for a Git commit.
+///
+/// Given a raw Git commit as a string, finds the timestamps in the given range
 /// that will produce the closest commit ID to target_hash. We ensure that
 /// min_timestamp <= author_timestamp <= committer_timestamp <= max_timestamp
 /// because it would be weird to it committed before being authored.
@@ -371,7 +363,7 @@ pub fn brute_force_timestamps(
     target_hash: &[u8],
     min_timestamp: i64,
     max_timestamp: i64,
-) -> (i64, i64, Vec<u8>, String) {
+) -> (i64, i64) {
     let base_commit_lines = base_commit.split('\n').collect::<Vec<&str>>();
     let author_line_index = base_commit_lines
         .iter()
@@ -408,7 +400,7 @@ pub fn brute_force_timestamps(
         commit_lines.join("\n")
     };
 
-    let (_score, author_timestamp, commit_timestamp, hash, candidate) = ((min_timestamp
+    let (_score, author_timestamp, commit_timestamp, hash, _candidate) = ((min_timestamp
         ..=max_timestamp)
         .into_par_iter()
         .map(|author_timestamp| {
@@ -437,16 +429,25 @@ pub fn brute_force_timestamps(
     .min()
     .unwrap();
 
-    (author_timestamp, commit_timestamp, hash, candidate)
+    debug!(
+        "Brute-forced a commit with id: {}",
+        hash.iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join("")
+    );
+
+    (author_timestamp, commit_timestamp)
 }
 
-/// Finds the generation index of a given Git commit.
+/// Finds the generation number of a given Git commit.
 ///
 /// The generation index is the number of edges of the longest path between the
 /// given commit and an initial commit (one with no parents, which has an
-/// implicit generation index of 0).
+/// implicit generation index of 0). The Git documentation also refers to this
+/// as the "topological level" of a commit (https://git-scm.com/docs/commit-graph).
 #[instrument(level = "debug")]
-pub fn generation_index(commit: &Commit) -> u32 {
+pub fn generation_number(commit: &Commit) -> u32 {
     let head = commit.clone();
 
     #[derive(Debug, Clone)]
@@ -524,11 +525,11 @@ pub fn generation_index(commit: &Commit) -> u32 {
         (head, initial_commits)
     };
 
-    let generation_index = {
+    let generation_number = {
         let span = debug_span!("measure_git_graph");
         let _guard = span.enter();
 
-        let mut generation_index = 0;
+        let mut generation_number = 0;
 
         let mut live = vec![root];
 
@@ -536,7 +537,7 @@ pub fn generation_index(commit: &Commit) -> u32 {
             let commit = commit.borrow_mut();
 
             if commit.edges_out.is_empty() {
-                generation_index = max(generation_index, commit.max_distance_from_head);
+                generation_number = max(generation_number, commit.max_distance_from_head);
             } else {
                 for parent in commit.edges_out.iter() {
                     let mut parent_mut = parent.borrow_mut();
@@ -553,10 +554,10 @@ pub fn generation_index(commit: &Commit) -> u32 {
             }
         }
 
-        generation_index
+        generation_number
     };
 
-    generation_index
+    generation_number
 }
 
 /// Initialize the typical global environment and parses the typical [Args] for
