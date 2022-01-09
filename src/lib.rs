@@ -7,19 +7,17 @@
 )]
 
 use {
-    git2::{Commit, Oid},
-    std::{cell::RefCell, cmp::max, collections::HashMap, path::PathBuf, process::Command, rc::Rc},
-    thousands::Separable,
-    tracing::{debug_span, instrument},
-    ::{
-        clap::Parser,
-        digest::Digest,
-        eyre::{bail, Result, WrapErr},
-        git2::{ErrorCode, Repository, RepositoryInitOptions, Signature, Time},
-        rayon::prelude::*,
-        std::{env, fs},
-        tracing::{debug, info, trace, warn},
+    clap::Parser,
+    digest::Digest,
+    eyre::{bail, Result, WrapErr},
+    git2::{Commit, ErrorCode, Oid, Repository, RepositoryInitOptions, Signature, Time},
+    rayon::prelude::*,
+    std::{
+        cell::RefCell, cmp::max, collections::HashMap, env, fs, path::PathBuf, process::Command,
+        rc::Rc,
     },
+    thousands::Separable,
+    tracing::{debug, debug_span, info, instrument, trace, warn},
 };
 
 /// Would you like to SAVE the change?
