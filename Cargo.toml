@@ -18,6 +18,16 @@ pre-release-commit-message = "v{{version}}"
 tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
 
+[[package.metadata.release.post-release-replacements]]
+file = "README.md"
+search = "cargo install save( --version .*)?\n"
+replace = "cargo install save\n"
+
+[[package.metadata.release.pre-release-replacements]]
+file = "README.md"
+search = "cargo install save( --version .*)?\n"
+replace = "cargo install save --version {{version}}\n"
+
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
 version = "3.0.4"
