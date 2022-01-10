@@ -10,7 +10,9 @@ use {
     clap::Parser,
     digest::Digest,
     eyre::{bail, Result, WrapErr},
-    git2::{Commit, ErrorCode, Oid, Repository, RepositoryInitOptions, Signature, Time},
+    git2::{
+        Commit, ErrorCode, Oid, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
+    },
     rayon::prelude::*,
     std::{
         cell::RefCell, cmp::max, collections::HashMap, env, fs, path::PathBuf, process::Command,
@@ -126,6 +128,13 @@ pub fn main(args: Args) -> Result<()> {
             }
         },
     };
+
+    if repo.state() != RepositoryState::Clean {
+        bail!(
+            "Repository is in the middle of another operation: {:?}",
+            repo.state()
+        );
+    }
 
     let head = match repo.head() {
         Ok(head) => Some(head.peel_to_commit().unwrap()),
