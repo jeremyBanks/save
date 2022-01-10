@@ -75,7 +75,8 @@ pub struct Args {
     /// such as `--squash=2` will squash that many recent commits (and any
     /// current changes) into a single commit. If any of those commits are
     /// merges, any non-squashed parents will be added as parents of the
-    /// squashed commit.
+    /// squashed commit. Any additional authors will be included in
+    /// Co-Authored-By footers.
     #[clap(
         long = "squash",
         short = 's',
@@ -114,6 +115,12 @@ pub fn main(args: Args) -> Result<()> {
     if args.squash_commits > 0 {
         todo!("--squash has not been implemented");
     }
+
+    let mut target_hash = args
+        .hash_hex
+        .as_ref()
+        .map(|s| hex::decode(s).wrap_err("target hash must be hex").unwrap())
+        .unwrap_or_default();
 
     let repo = open_or_init_repo(&args)?;
 
@@ -191,10 +198,6 @@ pub fn main(args: Args) -> Result<()> {
     let min_timestamp = seconds;
     let max_timestamp = seconds + step_seconds - 1;
 
-    let mut target_hash = args
-        .hash_hex
-        .map(|s| hex::decode(s).wrap_err("target hash must be hex").unwrap())
-        .unwrap_or_default();
     target_hash.append(&mut tree.id().as_bytes().to_vec());
 
     let base_commit = repo
