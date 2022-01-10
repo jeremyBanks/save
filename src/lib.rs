@@ -65,8 +65,24 @@ pub struct Args {
     #[clap(long, short = 'q', parse(from_occurrences))]
     pub quiet: i32,
 
+    /// Squash/amend previous commit(s), instead of adding a new one.
+    ///
+    /// By default, `--squash` will behave like `git commit --amend`, only
+    /// replacing the most recent commit. However, specifying a larger number
+    /// such as `--squash=2` will squash that many recent commits (and any
+    /// current changes) into a single commit. If any of those commits are
+    /// merges, any non-squashed parents will be added as parents of the
+    /// squashed commit.
+    #[clap(
+        long = "squash",
+        short = 's',
+        default_value = "0",
+        default_missing_value = "1"
+    )]
+    pub squash_commits: u32,
+
     /// Seconds of timestamp allocated for each commit to search.
-    #[clap(long="step", short='s', default_value_t = 64 * 2)]
+    #[clap(long="step", short='t', default_value_t = 64 * 2)]
     pub step_seconds: u32,
 
     /// Increase log verbosity. May be used multiple times.
@@ -128,6 +144,10 @@ pub fn main(args: Args) -> Result<()> {
             }
         },
     };
+
+    if args.squash_commits > 0 {
+        todo!("--squash has not been implemented");
+    }
 
     if repo.state() != RepositoryState::Clean {
         bail!(
