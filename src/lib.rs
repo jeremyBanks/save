@@ -78,7 +78,6 @@ pub struct Args {
     /// squashed commit.
     #[clap(
         long = "squash",
-        aliases = &["amend", "fix"],
         short = 's',
         default_value = "0",
         default_missing_value = "1"
@@ -256,6 +255,8 @@ pub fn main(args: Args) -> Result<()> {
     Ok(())
 }
 
+/// Determine the Git user name and email to use.
+#[instrument(level = "debug", skip(repo))]
 fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
     let config = repo.config()?;
 
@@ -325,6 +326,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
 }
 
 /// Generates an updated [git2::Index] with every file in the directory.
+#[instrument(level = "debug", skip(repo))]
 fn new_index(repo: &Repository) -> Result<Index> {
     let mut index = repo.index()?;
     index
@@ -351,7 +353,9 @@ fn new_index(repo: &Repository) -> Result<Index> {
     Ok(index)
 }
 
-/// Opens or initializes a new repository in CWD or GIT_DIR, if args allow it.
+/// Opens or initializes a new [git2::Repository] in CWD or GIT_DIR, if args
+/// allow it.
+#[instrument(level = "debug")]
 fn open_or_init_repo(args: &Args) -> Result<Repository> {
     let repo = match Repository::open_from_env() {
         Ok(repo) => {
@@ -403,7 +407,7 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
     Ok(repo)
 }
 
-/// Brute forces timestamps for a Git commit.
+/// Brute forces timestamps for a raw Git commit.
 ///
 /// Given a raw Git commit as a string, finds the timestamps in the given range
 /// that will produce the closest commit ID to target_hash. We ensure that
@@ -492,12 +496,12 @@ pub fn brute_force_timestamps(
     (author_timestamp, commit_timestamp)
 }
 
-/// Finds the generation number of a given Git commit.
+/// Finds the generation number of a [git2::Commit].
 ///
 /// The generation index is the number of edges of the longest path between the
 /// given commit and an initial commit (one with no parents, which has an
 /// implicit generation index of 0). The Git documentation also refers to this
-/// as the "topological level" of a commit (https://git-scm.com/docs/commit-graph).
+/// as the "topological level" of a commit (<https://git-scm.com/docs/commit-graph>).
 #[instrument(level = "debug")]
 pub fn generation_number(commit: &Commit) -> u32 {
     let head = commit.clone();
