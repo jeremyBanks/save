@@ -45,7 +45,7 @@ pub struct Args {
     #[clap(long = "hash", short = 'x')]
     pub hash_hex: Option<String>,
 
-    /// Use a manual commit message instead of the default generated message.
+    /// Specify a commit message to use instead of the default.
     #[clap(long, short = 'm')]
     pub message: Option<String>,
 
@@ -75,6 +75,7 @@ pub struct Args {
     /// squashed commit.
     #[clap(
         long = "squash",
+        alias = "amend",
         short = 's',
         default_value = "0",
         default_missing_value = "1"
@@ -82,6 +83,9 @@ pub struct Args {
     pub squash_commits: u32,
 
     /// Seconds of timestamp allocated for each commit to search.
+    ///
+    /// The number of possibilities searched is the half the square of this
+    /// value.
     #[clap(long="step", short='t', default_value_t = 64 * 2)]
     pub step_seconds: u32,
 
@@ -629,7 +633,7 @@ pub fn init() -> Args {
             .finish(),
     ));
 
-    trace!("Initialized from {:#?}", args);
+    trace!("Initialized from: {:#?}", args);
 
     args
 }
