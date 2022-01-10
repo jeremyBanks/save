@@ -11,7 +11,8 @@ use {
     digest::Digest,
     eyre::{bail, Result, WrapErr},
     git2::{
-        Commit, ErrorCode, Oid, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
+        Commit, ErrorCode, Index, Oid, Repository, RepositoryInitOptions, RepositoryState,
+        Signature, Time,
     },
     rayon::prelude::*,
     std::{
@@ -45,7 +46,9 @@ pub struct Args {
     #[clap(long = "hash", short = 'x')]
     pub hash_hex: Option<String>,
 
-    /// Specify a commit message to use instead of the default.
+    /// Commit message to use.
+    ///
+    /// [default: generated from generation number, tree hash, and parents]
     #[clap(long, short = 'm')]
     pub message: Option<String>,
 
@@ -75,7 +78,7 @@ pub struct Args {
     /// squashed commit.
     #[clap(
         long = "squash",
-        alias = "amend",
+        aliases = &["amend", "fix"],
         short = 's',
         default_value = "0",
         default_missing_value = "1"
@@ -109,56 +112,11 @@ pub struct Args {
 /// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
-    let repo = match Repository::open_from_env() {
-        Ok(repo) => {
-            if repo.is_bare() {
-                bail!(
-                    "Found Git repository, but it was bare (no working directory): {:?}",
-                    repo.path()
-                );
-            }
-
-            debug!("Found Git repository: {:?}", repo.workdir().unwrap());
-            repo
-        },
-        Err(_err) => {
-            let path = std::env::current_dir()?;
-            let empty = fs::read_dir(&path)?.next().is_none();
-            info!("No Git repository found.");
-
-            let dangerous = (path == home::home_dir().unwrap()) || (path.to_str() == Some("/"));
-
-            if dangerous && !args.yes {
-                bail!(
-                    "Current directory seems important, skipping auto-init (-y/--yes to override)."
-                );
-            } else if empty && !args.yes {
-                bail!("Current directory is empty, skipping auto-init (-y/--yes to override).");
-            } else {
-                info!("Initializing a new Git repository in: {:?}", path);
-                if args.dry_run {
-                    bail!("Can't initialize a new repository on a dry run.");
-                }
-                Repository::init_opts(
-                    path,
-                    RepositoryInitOptions::new()
-                        .initial_head("trunk")
-                        .no_reinit(true),
-                )?
-            }
-        },
-    };
-
     if args.squash_commits > 0 {
         todo!("--squash has not been implemented");
     }
 
-    if repo.state() != RepositoryState::Clean {
-        bail!(
-            "Repository is in the middle of another operation: {:?}",
-            repo.state()
-        );
-    }
+    let repo = open_or_init_repo(&args)?;
 
     let head = match repo.head() {
         Ok(head) => Some(head.peel_to_commit().unwrap()),
@@ -168,98 +126,14 @@ pub fn main(args: Args) -> Result<()> {
         },
     };
 
-    let config = repo.config()?;
-
-    let user_name: String = {
-        if let Some(args_name) = args.name {
-            trace!(
-                "Using author name from command line argument: {:?}",
-                &args_name
-            );
-            args_name
-        } else if let Ok(config_name) = config.get_string("user.name") {
-            debug!(
-                "Using author name from Git configuration: {:?}",
-                &config_name
-            );
-            config_name
-        } else if let Some(previous_name) = head
-            .as_ref()
-            .and_then(|x| x.author().name().map(|x| x.to_string()))
-        {
-            info!(
-                "Using author name from previous commit: {:?}",
-                &previous_name
-            );
-            previous_name
-        } else {
-            let placeholder_name = "save";
-            warn!(
-                "No author name found, falling back to placeholder: {:?}",
-                &placeholder_name
-            );
-            placeholder_name.to_string()
-        }
-    };
-
-    let user_email: String = if let Some(args_email) = args.email {
-        trace!(
-            "Using author email from command line argument: {:?}",
-            &args_email
-        );
-        args_email
-    } else if let Ok(config_email) = config.get_string("user.email") {
-        debug!(
-            "Using author email from Git configuration: {:?}",
-            &config_email
-        );
-        config_email
-    } else if let Some(previous_email) = head
-        .as_ref()
-        .and_then(|x| x.author().email().map(|x| x.to_string()))
-    {
-        info!(
-            "Using author email from previous commit: {:?}",
-            &previous_email
-        );
-        previous_email
-    } else {
-        let placeholder_email = "save";
-        warn!(
-            "No author email found, falling back to placeholder: {:?}",
-            &placeholder_email
-        );
-        placeholder_email.to_string()
-    };
+    let (user_name, user_email) = get_git_user(&args, &repo, &head)?;
 
     let generation_number = head
         .as_ref()
         .map(|commit| generation_number(commit) + 1)
         .unwrap_or(0);
 
-    let mut index = repo.index()?;
-
-    index
-        .add_all(
-            ["*"],
-            Default::default(),
-            Some(&mut |path, _| {
-                if path.to_string_lossy().ends_with('/') {
-                    let mut git_path = PathBuf::from(path);
-                    git_path.push(".git");
-                    if git_path.is_dir() {
-                        warn!(
-                            "Encountered a Git submodule; skipping it: {}",
-                            git_path.to_string_lossy()
-                        );
-                        return 1;
-                    }
-                }
-                trace!("Adding: {}", path.to_string_lossy());
-                0
-            }),
-        )
-        .wrap_err("Failed to add something to the Git index.")?;
+    let mut index = new_index(&repo)?;
 
     let tree = index.write_tree()?;
 
@@ -380,6 +254,153 @@ pub fn main(args: Args) -> Result<()> {
     eprintln!();
 
     Ok(())
+}
+
+fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
+    let config = repo.config()?;
+
+    let user_name: String = {
+        if let Some(ref args_name) = args.name {
+            trace!(
+                "Using author name from command line argument: {:?}",
+                &args_name
+            );
+            args_name.clone()
+        } else if let Ok(config_name) = config.get_string("user.name") {
+            debug!(
+                "Using author name from Git configuration: {:?}",
+                &config_name
+            );
+            config_name
+        } else if let Some(previous_name) = head
+            .as_ref()
+            .and_then(|x| x.author().name().map(|x| x.to_string()))
+        {
+            info!(
+                "Using author name from previous commit: {:?}",
+                &previous_name
+            );
+            previous_name
+        } else {
+            let placeholder_name = "save";
+            warn!(
+                "No author name found, falling back to placeholder: {:?}",
+                &placeholder_name
+            );
+            placeholder_name.to_string()
+        }
+    };
+
+    let user_email: String = if let Some(ref args_email) = args.email {
+        trace!(
+            "Using author email from command line argument: {:?}",
+            &args_email
+        );
+        args_email.clone()
+    } else if let Ok(config_email) = config.get_string("user.email") {
+        debug!(
+            "Using author email from Git configuration: {:?}",
+            &config_email
+        );
+        config_email
+    } else if let Some(previous_email) = head
+        .as_ref()
+        .and_then(|x| x.author().email().map(|x| x.to_string()))
+    {
+        info!(
+            "Using author email from previous commit: {:?}",
+            &previous_email
+        );
+        previous_email
+    } else {
+        let placeholder_email = "save";
+        warn!(
+            "No author email found, falling back to placeholder: {:?}",
+            &placeholder_email
+        );
+        placeholder_email.to_string()
+    };
+
+    Ok((user_name, user_email))
+}
+
+/// Generates an updated [git2::Index] with every file in the directory.
+fn new_index(repo: &Repository) -> Result<Index> {
+    let mut index = repo.index()?;
+    index
+        .add_all(
+            ["*"],
+            Default::default(),
+            Some(&mut |path, _| {
+                if path.to_string_lossy().ends_with('/') {
+                    let mut git_path = PathBuf::from(path);
+                    git_path.push(".git");
+                    if git_path.is_dir() {
+                        warn!(
+                            "Encountered a Git submodule; skipping it: {}",
+                            git_path.to_string_lossy()
+                        );
+                        return 1;
+                    }
+                }
+                trace!("Adding: {}", path.to_string_lossy());
+                0
+            }),
+        )
+        .wrap_err("Failed to add something to the Git index.")?;
+    Ok(index)
+}
+
+/// Opens or initializes a new repository in CWD or GIT_DIR, if args allow it.
+fn open_or_init_repo(args: &Args) -> Result<Repository> {
+    let repo = match Repository::open_from_env() {
+        Ok(repo) => {
+            if repo.is_bare() {
+                bail!(
+                    "Found Git repository, but it was bare (no working directory): {:?}",
+                    repo.path()
+                );
+            }
+
+            debug!("Found Git repository: {:?}", repo.workdir().unwrap());
+            repo
+        },
+        Err(_err) => {
+            let path = std::env::current_dir()?;
+            let empty = fs::read_dir(&path)?.next().is_none();
+            info!("No Git repository found.");
+
+            let dangerous = (path == home::home_dir().unwrap()) || (path.to_str() == Some("/"));
+
+            if dangerous && !args.yes {
+                bail!(
+                    "Current directory seems important, skipping auto-init (-y/--yes to override)."
+                );
+            } else if empty && !args.yes {
+                bail!("Current directory is empty, skipping auto-init (-y/--yes to override).");
+            } else {
+                info!("Initializing a new Git repository in: {:?}", path);
+                if args.dry_run {
+                    bail!("Can't initialize a new repository on a dry run.");
+                }
+                Repository::init_opts(
+                    path,
+                    RepositoryInitOptions::new()
+                        .initial_head("trunk")
+                        .no_reinit(true),
+                )?
+            }
+        },
+    };
+
+    if repo.state() != RepositoryState::Clean {
+        bail!(
+            "Repository is in the middle of another operation: {:?}",
+            repo.state()
+        );
+    }
+
+    Ok(repo)
 }
 
 /// Brute forces timestamps for a Git commit.
