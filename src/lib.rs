@@ -427,14 +427,14 @@ pub fn brute_force_timestamps(
     let author_line_index = base_commit_lines
         .iter()
         .position(|line| line.starts_with("author "))
-        .unwrap();
+        .expect("author line missing in commit");
     let author_line_pieces = &base_commit_lines[author_line_index]
         .split(' ')
         .collect::<Vec<_>>();
     let committer_line_index = base_commit_lines
         .iter()
         .position(|line| line.starts_with("committer "))
-        .unwrap();
+        .expect("committer line missing in commit");
     let committer_line_pieces = &base_commit_lines[committer_line_index]
         .split(' ')
         .collect::<Vec<_>>();
