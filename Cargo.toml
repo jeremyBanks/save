@@ -20,7 +20,7 @@ tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
 
 [package.metadata.docs.rs]
-rustdoc-args = ["--document-private-items", "--html-in-header", "/etc/hosts"]
+rustdoc-args = ["--document-private-items"]
 
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
