@@ -51,11 +51,11 @@ OPTIONS:
             By default, `--squash` will behave like `git commit
             --amend`, only replacing the most recent commit. However,
             specifying a larger number such as `--squash=2` will
-            squash that many recent commits (and any current changes)
-            into a single commit. If any of those commits are merges,
-            any non-squashed parents will be added as parents of the
-            squashed commit. Any additional authors will be included
-            in Co-Authored-By footers.
+            squash that many recent first-parents (and any current
+            changes) into a single commit. If any of those commits are
+            merges, any non-squashed parents will be added as parents
+            of the squashed commit. Any additional authors will be
+            included in Co-Authored-By footers.
             
             [default: 0]
 

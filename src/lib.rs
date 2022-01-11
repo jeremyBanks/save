@@ -47,8 +47,8 @@ pub struct Args {
     ///
     /// By default, `--squash` will behave like `git commit --amend`, only
     /// replacing the most recent commit. However, specifying a larger number
-    /// such as `--squash=2` will squash that many recent commits (and any
-    /// current changes) into a single commit. If any of those commits are
+    /// such as `--squash=2` will squash that many recent first-parents (and
+    /// any current changes) into a single commit. If any of those commits are
     /// merges, any non-squashed parents will be added as parents of the
     /// squashed commit. Any additional authors will be included in
     /// Co-Authored-By footers.
@@ -88,7 +88,7 @@ pub struct Args {
     ///
     /// The number of possibilities searched is the half the square of this
     /// value.
-    #[clap(long="step", short='t', default_value_t = 128)]
+    #[clap(long = "step", short = 't', default_value_t = 128)]
     pub step_seconds: u32,
 
     /// Decrease log verbosity. May be used multiple times.

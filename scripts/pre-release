@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 set -veuo pipefail
-shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
-INSTALL_VERSION="$NEW_VERSION" ./readme
+cargo clippy --fix --allow-dirty
+cargo +nightly fmt
+cargo test
+INSTALL_VERSION="$NEW_VERSION" scripts/readme

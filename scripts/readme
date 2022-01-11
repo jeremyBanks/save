@@ -1,6 +1,5 @@
-#!/bin/bash
+#!/bin/sh
 set -veuo pipefail
-shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
 cd "$(dirname "$0")/.."
 
