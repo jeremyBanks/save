@@ -4,4 +4,4 @@ shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
 cd "$(dirname "$0")"
 
-./readme
+INSTALL_VERSION="$NEW_VERSION" ./readme
