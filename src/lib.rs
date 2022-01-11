@@ -27,7 +27,7 @@ use {
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
-#[clap(version, term_width = 72)]
+#[clap(version, term_width = 70)]
 #[remain::sorted]
 pub struct Args {
     /// Prepare the commit, but don't actually save anything to disk.

@@ -1,5 +1,5 @@
 ```sh
-$ cargo install --version 0.5.3
+$ cargo install
 ```
 
 ```sh
@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.5.3
+save 0.5.4-dev
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -19,8 +19,8 @@ OPTIONS:
     -a, --name <NAME>
             The author name to use for the commit.
             
-            [default: name from git, or else from parent commit, or else
-            "save"]
+            [default: name from git, or else from parent commit, or
+            else "save"]
 
     -e, --email <EMAIL>
             The author email to use for the commit.
@@ -38,7 +38,8 @@ OPTIONS:
             parents]
 
     -n, --dry-run
-            Prepare the commit, but don't actually save anything to disk
+            Prepare the commit, but don't actually save anything to
+            disk
 
     -q, --quiet
             Decrease log verbosity. May be used multiple times
@@ -49,20 +50,20 @@ OPTIONS:
             
             By default, `--squash` will behave like `git commit
             --amend`, only replacing the most recent commit. However,
-            specifying a larger number such as `--squash=2` will squash
-            that many recent commits (and any current changes) into a
-            single commit. If any of those commits are merges, any non-
-            squashed parents will be added as parents of the squashed
-            commit. Any additional authors will be included in Co-
-            Authored-By footers.
+            specifying a larger number such as `--squash=2` will
+            squash that many recent commits (and any current changes)
+            into a single commit. If any of those commits are merges,
+            any non-squashed parents will be added as parents of the
+            squashed commit. Any additional authors will be included
+            in Co-Authored-By footers.
             
             [default: 0]
 
     -t, --step <STEP_SECONDS>
             Seconds of timestamp allocated for each commit to search.
             
-            The number of possibilities searched is the half the square
-            of this value.
+            The number of possibilities searched is the half the
+            square of this value.
             
             [default: 128]
 
