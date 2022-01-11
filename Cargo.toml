@@ -19,6 +19,9 @@ pre-release-hook = ["scripts/pre-release"]
 tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--document-private-items", "--scrape-examples"]
+
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
 version = "3.0.4"
