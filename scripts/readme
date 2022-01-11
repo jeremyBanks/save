@@ -2,8 +2,13 @@
 set -euo pipefail
 shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
+declare install_args=""
+if [[ "${NEW_VERSION:-}" ]]; then
+  install_args=" --version $NEW_VERSION"
+fi
+
 echo '```sh
-$ cargo install save
+$ cargo install'"${install_args}"'
 ```
 
 ```sh
