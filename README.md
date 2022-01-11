@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.5.16
+$ cargo install save --version 0.5.17
 ```
 
 ```sh
@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.5.16
+save 0.5.17
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
