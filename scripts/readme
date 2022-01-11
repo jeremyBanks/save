@@ -10,7 +10,7 @@ if [[ -n "${INSTALL_VERSION:=}" ]]; then
 fi
 
 echo '```sh
-$ cargo install'"${install_args}"'
+$ cargo install save'"${install_args}"'
 ```
 
 ```sh
