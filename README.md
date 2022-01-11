@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.5.6
+save 0.5.7-dev
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.

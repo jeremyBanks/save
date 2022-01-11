@@ -5,7 +5,7 @@ shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 cd "$(dirname "$0")/.."
 
 declare install_args=""
-if [[ "${INSTALL_VERSION:-}" ]]; then
+if [[ -n "${INSTALL_VERSION:=}" ]]; then
   install_args=" --version $INSTALL_VERSION"
 fi
 
