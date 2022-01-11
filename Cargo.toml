@@ -47,9 +47,6 @@ version = "0.5.3"
 [dependencies.rayon]
 version = "1.5.1"
 
-[dependencies.remain]
-version = "0.2.2"
-
 [dependencies.sha-1]
 version = "0.10.0"
 

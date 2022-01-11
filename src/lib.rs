@@ -28,45 +28,20 @@ use {
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
 #[clap(version, max_term_width = option_env!("MAX_TERM_WIDTH").unwrap_or("0").parse().unwrap())]
-#[remain::sorted]
 pub struct Args {
-    /// Prepare the commit, but don't actually save anything to disk.
-    #[clap(long, short = 'n')]
-    pub dry_run: bool,
-
-    /// The author email to use for the commit.
-    ///
-    /// [default: email from git, or else from parent commit, or else "save"]
-    #[clap(long, short = 'e')]
-    pub email: Option<String>,
-
-    /// The target commit hash or prefix, in hex.
-    ///
-    /// [default: the commit's tree hash]
-    #[clap(long = "hash", short = 'x')]
-    pub hash_hex: Option<String>,
-
     /// Commit message to use.
     ///
     /// [default: generated from generation number, tree hash, and parents]
     #[clap(long, short = 'm')]
     pub message: Option<String>,
 
-    /// The author name to use for the commit.
-    ///
-    /// [default: name from git, or else from parent commit, or else "save"]
-    #[clap(long, short = 'a')]
-    pub name: Option<String>,
+    /// Prepare the commit, but don't actually save anything to disk.
+    #[clap(long, short = 'n')]
+    pub dry_run: bool,
 
-    /// The time is NOW.
-    ///
-    /// [default: the time is ACTUALLY now]
-    #[clap(long = "now", short = 'w')]
-    pub now_seconds: Option<i64>,
-
-    /// Decrease log verbosity. May be used multiple times.
-    #[clap(long, short = 'q', parse(from_occurrences))]
-    pub quiet: i32,
+    /// Proceed in spite of any warnings.
+    #[clap(long, short = 'y')]
+    pub yes: bool,
 
     /// Squash/amend previous commit(s), instead of adding a new one.
     ///
@@ -85,20 +60,44 @@ pub struct Args {
     )]
     pub squash_commits: u32,
 
+    /// The target commit hash or prefix, in hex.
+    ///
+    /// [default: the commit's tree hash]
+    #[clap(long = "hash", short = 'x')]
+    pub hash_hex: Option<String>,
+
+    /// The name to use for the commit's author and committer.
+    ///
+    /// [default: name from git, or else from parent commit, or else "save"]
+    #[clap(long = "name")]
+    pub name: Option<String>,
+
+    /// The email to use for the commit's author and committer.
+    ///
+    /// [default: email from git, or else from parent commit, or else "save"]
+    #[clap(long)]
+    pub email: Option<String>,
+
+    /// The time is NOW.
+    ///
+    /// [default: the time is ACTUALLY now]
+    #[clap(long = "now", short = 'w')]
+    pub now_seconds: Option<i64>,
+
     /// Seconds of timestamp allocated for each commit to search.
     ///
     /// The number of possibilities searched is the half the square of this
     /// value.
-    #[clap(long="step", short='t', default_value_t = 64 * 2)]
+    #[clap(long="step", short='t', default_value_t = 128)]
     pub step_seconds: u32,
+
+    /// Decrease log verbosity. May be used multiple times.
+    #[clap(long, short = 'q', parse(from_occurrences))]
+    pub quiet: i32,
 
     /// Increase log verbosity. May be used multiple times.
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
-
-    /// Proceed in spite of any warnings.
-    #[clap(long, short = 'y')]
-    pub yes: bool,
 }
 
 /// CLI entry point.

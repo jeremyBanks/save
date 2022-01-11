@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.5.9
+$ cargo install save
 ```
 
 ```sh
@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.5.9
+save 0.5.10-dev
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -16,14 +16,8 @@ USAGE:
     save [OPTIONS]
 
 OPTIONS:
-    -a, --name <NAME>
-            The author name to use for the commit.
-            
-            [default: name from git, or else from parent commit, or
-            else "save"]
-
-    -e, --email <EMAIL>
-            The author email to use for the commit.
+        --email <EMAIL>
+            The email to use for the commit's author and committer.
             
             [default: email from git, or else from parent commit, or
             else "save"]
@@ -40,6 +34,12 @@ OPTIONS:
     -n, --dry-run
             Prepare the commit, but don't actually save anything to
             disk
+
+        --name <NAME>
+            The name to use for the commit's author and committer.
+            
+            [default: name from git, or else from parent commit, or
+            else "save"]
 
     -q, --quiet
             Decrease log verbosity. May be used multiple times
