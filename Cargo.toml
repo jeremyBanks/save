@@ -2,7 +2,7 @@
 authors = ["Jeremy Banks <_@jeremy.ca>"]
 description = "Would you like to SAVE the change?"
 edition = "2021"
-include = ["/src/**.rs", "/*.toml", "/*.md"]
+include = ["/src/**.rs", "/*.toml", "/*.md", "/*.html"]
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
