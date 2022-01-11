@@ -1,5 +1,9 @@
 #!/bin/bash
-set -euo pipefail
+set -veuo pipefail
 shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
-"$(dirname $)/readme"
+cd "$(dirname "$0")"
+
+export INSTALL_VERSION="$NEW_VERSION"
+
+./readme

@@ -1,10 +1,12 @@
 #!/bin/bash
-set -euo pipefail
+set -veuo pipefail
 shopt -s inherit_errexit nullglob compat"${BASH_COMPAT=42}"
 
+cd "$(dirname "$0")/.."
+
 declare install_args=""
-if [[ "${NEW_VERSION:-}" ]]; then
-  install_args=" --version $NEW_VERSION"
+if [[ "${INSTALL_VERSION:-}" ]]; then
+  install_args=" --version $INSTALL_VERSION"
 fi
 
 echo '```sh
@@ -16,5 +18,5 @@ $ save --help
 ```
 
 ```text
-'"$(NO_COLOR=NO cargo run --manifest-path="$(dirname "$0")/../Cargo.toml" -- --help)"'
+'"$(NO_COLOR=NO MAX_TERM_WIDTH=70 cargo run -- --help)"'
 ```' > "$(dirname "$0")/../README.md"
