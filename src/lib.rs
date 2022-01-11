@@ -413,9 +413,9 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
 /// Brute forces timestamps for a raw Git commit.
 ///
 /// Given a raw Git commit as a string, finds the timestamps in the given range
-/// that will produce the closest commit ID to target_hash. We ensure that
-/// min_timestamp <= author_timestamp <= committer_timestamp <= max_timestamp
-/// because it would be weird to it to be committed before being authored.
+/// that will produce the closest commit ID to target_hash. We search possible
+/// commits where
+/// `min_timestamp <= author_timestamp <= committer_timestamp <= max_timestamp`.
 #[instrument(level = "debug")]
 pub fn brute_force_timestamps(
     base_commit: &str,
