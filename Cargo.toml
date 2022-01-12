@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
 resolver = "2"
-version = "0.5.20-dev"
+version = "0.5.19-dev"
 
 [package.metadata.release]
 allow-branch = ["trunk"]
@@ -20,7 +20,8 @@ tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
 
 [package.metadata.docs.rs]
-cargo-args = ["--document-private-items", "-Zunstable-options", "-Zrustdoc-scrape-examples=examples"]
+rustdoc-args = ["--document-private-items"]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples=examples"]
 
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
