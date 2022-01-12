@@ -2,7 +2,7 @@
 authors = ["Jeremy Banks <_@jeremy.ca>"]
 description = "Would you like to SAVE the change?"
 edition = "2021"
-include = ["/src/**.rs", "/*.toml", "/*.md", "/*.html"]
+include = ["/src/**.rs", "/*.toml", "/*.md"]
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
@@ -20,7 +20,7 @@ tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
 
 [package.metadata.docs.rs]
-rustdoc-args = ["--document-private-items"]
+cargo-args = ["--document-private-items", "-Zunstable-options", "-Zrustdoc-scrape-examples=examples"]
 
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
