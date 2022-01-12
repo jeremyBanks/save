@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
 resolver = "2"
-version = "0.5.23"
+version = "0.5.24-dev"
 
 [package.metadata.release]
 allow-branch = ["trunk"]
