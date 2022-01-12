@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.5.23
+$ cargo install save
 ```
 
 ```sh
@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.5.23
+save 0.6.0-dev
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -43,6 +43,21 @@ OPTIONS:
 
     -q, --quiet
             Decrease log verbosity. May be used multiple times
+
+    -s, --squash <SQUASH_COMMITS>
+            Squash/amend previous commit(s), instead of adding a new
+            one.
+            
+            By default, `--squash` will behave like `git commit
+            --amend`, only replacing the most recent commit. However,
+            specifying a larger number such as `--squash=2` will
+            squash that many recent first-parents (and any current
+            changes) into a single commit. If any of those commits are
+            merges, any non-squashed parents will be added as parents
+            of the squashed commit. Any additional authors will be
+            included in Co-Authored-By footers.
+            
+            [default: 0]
 
     -t, --step <STEP_SECONDS>
             Seconds of timestamp allocated for each commit to search.

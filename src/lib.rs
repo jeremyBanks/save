@@ -53,7 +53,6 @@ pub struct Args {
     /// squashed commit. Any additional authors will be included in
     /// Co-Authored-By footers.
     #[clap(
-        hide = true,
         long = "squash",
         short = 's',
         default_value = "0",
@@ -101,11 +100,12 @@ pub struct Args {
     pub verbose: i32,
 }
 
-// Used to override the max_term_width of our derived [Args]
-// using the **build time** environment variable MAX_TERM_WIDTH.
-// This is hacky and inefficient, only meant for internal use in
-// generating the `--help` text for `README.md`, which needs to be
-// tightly wrapped to fit in available space on crates.io.
+/// Used to override the max_term_width of our derived [Args]
+/// using the **build time** environment variable MAX_TERM_WIDTH.
+///
+/// This is hacky and bad for the build cache, only meant for internal use in
+/// generating the `--help` text for `README.md`, which needs to be
+/// tightly wrapped to fit in available space on crates.io.
 fn max_term_width() -> usize {
     option_env!("MAX_TERM_WIDTH")
         .unwrap_or("100")
