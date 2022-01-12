@@ -3,7 +3,8 @@
     missing_docs,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::missing_safety_doc
+    clippy::missing_safety_doc,
+    clippy::missing_docs_in_private_items
 )]
 
 use {
