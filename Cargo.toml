@@ -2,6 +2,7 @@
 authors = ["Jeremy Banks <_@jeremy.ca>"]
 description = "Would you like to SAVE the change?"
 edition = "2021"
+homepage = "https://lib.rs/save"
 include = ["/src/**.rs", "examples/**.rs", "/*.toml", "/*.md", "/scripts/*"]
 license = "MIT OR Apache-2.0"
 name = "save"
@@ -29,9 +30,6 @@ version = "3.0.4"
 
 [dependencies.color-eyre]
 version = "0.5.11"
-
-[dependencies.crossterm]
-version = "0.22.1"
 
 [dependencies.digest]
 version = "0.10.1"

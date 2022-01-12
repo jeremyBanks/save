@@ -3,8 +3,7 @@
     missing_docs,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::missing_safety_doc,
-    clippy::missing_docs_in_private_items
+    clippy::missing_safety_doc
 )]
 
 use {
@@ -28,7 +27,7 @@ use {
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
-#[clap(version, max_term_width = option_env!("MAX_TERM_WIDTH").unwrap_or("0").parse().unwrap())]
+#[clap(version, max_term_width = max_term_width())]
 pub struct Args {
     /// Commit message to use.
     ///
@@ -99,6 +98,18 @@ pub struct Args {
     /// Increase log verbosity. May be used multiple times.
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
+}
+
+// Used to override the max_term_width of our derived [Args]
+// using the **build time** environment variable MAX_TERM_WIDTH.
+// This is hacky and inefficient, only meant for internal use in
+// generating the `--help` text for `README.md`, which needs to be
+// tightly wrapped to fit in available space on crates.io.
+fn max_term_width() -> usize {
+    option_env!("MAX_TERM_WIDTH")
+        .unwrap_or("100")
+        .parse()
+        .unwrap()
 }
 
 /// CLI entry point.
@@ -512,11 +523,12 @@ pub fn generation_number(commit: &Commit) -> u32 {
 
     #[derive(Debug, Clone)]
     struct CommitNode {
-        // number of edges (git children) whose distances hasn't been accounted-for yet
+        /// number of edges (git children) whose distances hasn't been
+        /// accounted-for yet
         unaccounted_edges_in: u32,
-        // max distance from head of accounted-for edges
+        /// max distance from head of accounted-for edges
         max_distance_from_head: u32,
-        // git parents of this node
+        /// git parents of this node
         edges_out: Vec<Rc<RefCell<CommitNode>>>,
     }
 
