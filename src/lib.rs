@@ -53,6 +53,7 @@ pub struct Args {
     /// squashed commit. Any additional authors will be included in
     /// Co-Authored-By footers.
     #[clap(
+        hide = true,
         long = "squash",
         short = 's',
         default_value = "0",
