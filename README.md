@@ -55,7 +55,8 @@ OPTIONS:
             changes) into a single commit. If any of those commits are
             merges, any non-squashed parents will be added as parents
             of the squashed commit. Any additional authors will be
-            included in Co-Authored-By footers.
+            included in Co-Authored-By footers. Commit messages will
+            be discarded.
             
             [default: 0]
 
