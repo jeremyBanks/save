@@ -7,7 +7,7 @@ use {
     tracing::{debug, debug_span, info, instrument, warn},
 };
 
-/// Extension methods for [git2::Repository].
+/// Extension methods for [`git2::Repository`].
 ///
 /// These methods are all non-destructive: although new objects may be written
 /// to the local Git database, nothing will be modified to point to them, nor
@@ -35,7 +35,7 @@ pub trait RepositoryExt: Borrow<Repository> {
 
 impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 
-/// Extension methods for [git2::Commit].
+/// Extension methods for [`git2::Commit`].
 ///
 /// These methods are all non-destructive: although new objects may be written
 /// to the local Git database, nothing will be modified to point to them, nor
@@ -88,7 +88,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                     .entry(commit.id())
                     .and_modify(|node| {
                         if let Some(from) = from {
-                            from.borrow_mut().edges_out.push(node.clone());
+                            from.borrow_mut().edges_out.push(Rc::clone(node));
                             node.borrow_mut().unaccounted_edges_in += 1;
                         }
                     })
@@ -100,17 +100,17 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                         }));
 
                         if let Some(from) = from {
-                            from.borrow_mut().edges_out.push(node.clone());
+                            from.borrow_mut().edges_out.push(Rc::clone(&node));
                         }
 
                         if commit.parents().len() == 0 {
                             debug!("Found an initial commit: {:?}", commit);
-                            initial_commits.push(node.clone());
+                            initial_commits.push(Rc::clone(&node));
                         } else {
                             for parent in commit.parents() {
                                 walks.push(CommitWalking {
                                     commit: parent,
-                                    from: Some(node.clone()),
+                                    from: Some(Rc::clone(&node)),
                                 });
                             }
                         }
@@ -125,7 +125,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                 initial_commits.len(),
             );
 
-            let head = all_commits.get(&head.id()).unwrap().clone();
+            let head = Rc::clone(all_commits.get(&head.id()).unwrap());
             (head, initial_commits)
         };
 
@@ -152,7 +152,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                         parent_mut.unaccounted_edges_in -= 1;
 
                         if parent_mut.unaccounted_edges_in == 0 {
-                            live.push(parent.clone());
+                            live.push(Rc::clone(parent));
                         }
                     }
                 }
@@ -226,7 +226,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
 impl<'repo, T> CommitExt<'repo> for T where T: Borrow<Commit<'repo>> + Debug {}
 
-/// The commit resulting from a [Commit::brute_force_timestamps] call, wrapped
+/// The commit resulting from a [`Commit::brute_force_timestamps`] call, wrapped
 /// to indicate whether the target prefix was complete or incompletely matched.
 #[derive(Debug, Clone)]
 #[must_use]
@@ -254,23 +254,24 @@ impl<'repo> Borrow<Commit<'repo>> for BruteForcedCommit<'repo> {
 impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
     fn from(commit: BruteForcedCommit<'repo>) -> Self {
         match commit {
-            BruteForcedCommit::Complete { commit } => commit,
-            BruteForcedCommit::Incomplete { commit, .. } => commit,
+            BruteForcedCommit::Complete { commit }
+            | BruteForcedCommit::Incomplete { commit, .. } => commit,
         }
     }
 }
 
 impl<'repo> BruteForcedCommit<'repo> {
-    /// Returns a reference to the underlying commit.
+    /// Returns a reference to the underlying [`Commit`].
     #[must_use]
     pub fn commit(&self) -> &Commit<'repo> {
         match self {
-            BruteForcedCommit::Complete { commit } => commit,
-            BruteForcedCommit::Incomplete { commit, .. } => commit,
+            BruteForcedCommit::Complete { commit }
+            | BruteForcedCommit::Incomplete { commit, .. } => commit,
         }
     }
 
-    /// Returns a reference to the underlying commit if it's a complete match.
+    /// Returns a reference to the underlying [`Commit`] if it is a complete
+    /// match.
     #[must_use]
     pub fn complete(self) -> Option<Commit<'repo>> {
         match self {
@@ -279,7 +280,7 @@ impl<'repo> BruteForcedCommit<'repo> {
         }
     }
 
-    /// Returns a reference to the underlying commit if it's not a complete
+    /// Returns a reference to the underlying [`Commit`] if it is not a complete
     /// match.
     #[must_use]
     pub fn incomplete(&self) -> Option<&Commit<'repo>> {

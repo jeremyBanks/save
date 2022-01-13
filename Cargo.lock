@@ -683,7 +683,6 @@ dependencies = [
  "thousands",
  "tracing",
  "tracing-error",
- "tracing-log",
  "tracing-subscriber",
 ]
 

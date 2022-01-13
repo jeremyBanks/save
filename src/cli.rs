@@ -91,8 +91,8 @@ pub struct Args {
     pub verbose: i32,
 }
 
-/// Used to override the max_term_width of our derived [Args]
-/// using the **build time** environment variable MAX_TERM_WIDTH.
+/// Used to override the `max_term_width` of our derived [`Args`]
+/// using the **build time** environment variable `MAX_TERM_WIDTH`.
 ///
 /// This is hacky and bad for the build cache, only meant for internal use in
 /// generating the `--help` text for `README.md`, which needs to be
@@ -247,7 +247,7 @@ pub fn main(args: Args) -> Result<()> {
     Ok(())
 }
 
-// #[instrument(level = "x", skip(repo))]
+#[instrument(level = "debug", skip(_repo))]
 fn squashed_commit<'a>(_repo: &'a mut Repository, _head: &'a Commit, _depth: usize) -> Commit<'a> {
     todo!();
 }
@@ -500,7 +500,8 @@ pub fn brute_force_timestamps(
 ///
 /// This will panic if called multiple times, or if other code attempts
 /// conflicting global initialization of systems such as logging.
-#[must_use] pub fn init() -> Args {
+#[must_use]
+pub fn init() -> Args {
     color_eyre::install().unwrap();
 
     let args = Args::parse();
