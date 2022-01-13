@@ -193,13 +193,13 @@ pub fn main(args: Args) -> Result<()> {
     if seconds_since_head < slack_seconds {
         seconds = previous_seconds + step_seconds;
     } else {
-        seconds = seconds - seconds % snap_seconds
+        seconds = seconds - seconds % snap_seconds;
     }
 
     let parents = &head.iter().collect::<Vec<_>>();
 
     let min_timestamp = seconds;
-    let _max_timestamp = seconds + step_seconds - 1;
+    let max_timestamp = seconds + step_seconds - 1;
 
     target_hash.append(&mut tree.id().as_bytes().to_vec());
 
@@ -213,10 +213,17 @@ pub fn main(args: Args) -> Result<()> {
     )?;
     let base_commit = repo.find_commit(base_commit)?;
 
-    let commit = base_commit.brute_force_timestamps(&target_hash, min_timestamp, todo!());
+    let commit = base_commit.brute_force_timestamps(&target_hash, min_timestamp, max_timestamp);
+
+    let commit = commit.commit();
 
     if !args.dry_run {
-        repo.update_ref("HEAD", commit);
+        let mut head_ref = repo.head()?;
+        if head_ref.is_branch() {
+            head_ref.set_target(commit.id(), "committed via save")?;
+        } else {
+            repo.set_head(&commit.id().to_string())?;
+        }
     }
 
     eprintln!();
@@ -265,7 +272,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
             config_name
         } else if let Some(previous_name) = head
             .as_ref()
-            .and_then(|x| x.author().name().map(|x| x.to_string()))
+            .and_then(|x| x.author().name().map(std::string::ToString::to_string))
         {
             info!(
                 "Using author name from previous commit: {:?}",
@@ -296,7 +303,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
         config_email
     } else if let Some(previous_email) = head
         .as_ref()
-        .and_then(|x| x.author().email().map(|x| x.to_string()))
+        .and_then(|x| x.author().email().map(std::string::ToString::to_string))
     {
         info!(
             "Using author email from previous commit: {:?}",
@@ -493,7 +500,7 @@ pub fn brute_force_timestamps(
 ///
 /// This will panic if called multiple times, or if other code attempts
 /// conflicting global initialization of systems such as logging.
-pub fn init() -> Args {
+#[must_use] pub fn init() -> Args {
     color_eyre::install().unwrap();
 
     let args = Args::parse();
