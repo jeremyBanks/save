@@ -20,7 +20,8 @@ pub trait RepositoryExt: Borrow<Repository> {
     /// # Panics
     ///
     /// If the repository is bare (per [Repository::is_bare]).
-    #[instrument(level = "debug", skip(self))]
+    #[instrument(level = "debug", skip_all)]
+    #[must_use]
     fn working_tree(&self) -> Tree {
         let repo: &Repository = self.borrow();
 
@@ -47,6 +48,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// has an implicit generation index of 0). The Git documentation also
     /// refers to this as the "topological level" of a commit (<https://git-scm.com/docs/commit-graph>).
     #[instrument(level = "debug")]
+    #[must_use]
     fn generation_number(&self) -> u32 {
         let commit: &Commit = self.borrow();
         let head = commit.clone();
@@ -165,6 +167,8 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// Returns a new Commit with the result of squashing this commit with it
     /// `depth` first-parent ancestors, and any merged-in descendant
     /// branches.
+    #[instrument(level = "debug")]
+    #[must_use]
     fn squashed(&self, depth: u32) -> Commit<'repo> {
         let commit: &Commit<'repo> = self.borrow();
         if depth == 0 {
@@ -194,6 +198,8 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// # Panics
     ///
     /// If `min_timestamp` > `max_timestamp`.
+    #[instrument(level = "debug", skip_all)]
+    #[must_use]
     fn brute_force_timestamps(
         &self,
         target_prefix: &[u8],
@@ -223,6 +229,7 @@ impl<'repo, T> CommitExt<'repo> for T where T: Borrow<Commit<'repo>> + Debug {}
 /// The commit resulting from a [Commit::brute_force_timestamps] call, wrapped
 /// to indicate whether the target prefix was complete or incompletely matched.
 #[derive(Debug, Clone)]
+#[must_use]
 pub enum BruteForcedCommit<'repo> {
     /// The specified `target_prefix` was entirely matched.
     Complete {
@@ -255,6 +262,7 @@ impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
 
 impl<'repo> BruteForcedCommit<'repo> {
     /// Returns a reference to the underlying commit.
+    #[must_use]
     pub fn commit(&self) -> &Commit<'repo> {
         match self {
             BruteForcedCommit::Complete { commit } => commit,
@@ -263,6 +271,7 @@ impl<'repo> BruteForcedCommit<'repo> {
     }
 
     /// Returns a reference to the underlying commit if it's a complete match.
+    #[must_use]
     pub fn complete(self) -> Option<Commit<'repo>> {
         match self {
             BruteForcedCommit::Complete { commit } => Some(commit),
@@ -272,6 +281,7 @@ impl<'repo> BruteForcedCommit<'repo> {
 
     /// Returns a reference to the underlying commit if it's not a complete
     /// match.
+    #[must_use]
     pub fn incomplete(&self) -> Option<&Commit<'repo>> {
         match self {
             BruteForcedCommit::Incomplete { commit, .. } => Some(commit),

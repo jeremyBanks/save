@@ -26,7 +26,7 @@ pub struct Args {
     #[clap(long, short = 'm')]
     pub message: Option<String>,
 
-    /// Prepare the commit, but don't actually save anything to disk.
+    /// Prepare the commit, but don't actually update any references in Git.
     #[clap(long, short = 'n')]
     pub dry_run: bool,
 
@@ -211,34 +211,12 @@ pub fn main(args: Args) -> Result<()> {
         &tree,
         parents,
     )?;
-    let _base_commit = repo.find_commit(base_commit)?;
+    let base_commit = repo.find_commit(base_commit)?;
 
-    let _base_commit = std::str::from_utf8(todo!())
-        .wrap_err("commit must be valid utf-8")
-        .unwrap();
-
-    let (author_timestamp, commit_timestamp) =
-        brute_force_timestamps(base_commit, &target_hash, min_timestamp, max_timestamp);
+    let commit = base_commit.brute_force_timestamps(&target_hash, min_timestamp, todo!());
 
     if !args.dry_run {
-        repo.commit(
-            Some("HEAD"),
-            &Signature::new(
-                &user_name,
-                &user_email,
-                &Time::new(author_timestamp, offset),
-            )
-            .unwrap(),
-            &Signature::new(
-                &user_name,
-                &user_email,
-                &Time::new(commit_timestamp, offset),
-            )
-            .unwrap(),
-            &message,
-            &tree,
-            parents,
-        )?;
+        repo.update_ref("HEAD", commit);
     }
 
     eprintln!();
