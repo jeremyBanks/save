@@ -1,42 +1,76 @@
-//! Some helpers for working with [`git2`].
+//! Helpers extending [`::git2`].
 
+#[allow(unused)]
+pub(crate) use git2::{
+    Blob, Branch, Commit, Config, Index, Object, Oid, Reference, Remote, Repository, Signature,
+    Tag, Tree,
+};
 use {
     digest::Digest,
-    git2::{Commit, Oid, Repository, Tree},
-    std::{borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug, rc::Rc},
+    eyre::{Context, Result},
+    std::{
+        borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug, path::PathBuf,
+        rc::Rc,
+    },
     thousands::Separable,
-    tracing::{debug, debug_span, info, instrument, warn},
+    tracing::{debug, debug_span, info, instrument, trace, warn},
 };
 
-/// Extension methods for [`git2::Repository`].
+/// Extension methods for [`Repository`].
 ///
 /// These methods are all non-destructive: although new objects may be written
 /// to the local Git database, nothing will be modified to point to them, nor
 /// will the index or working tree be modified.
 pub trait RepositoryExt: Borrow<Repository> {
-    /// Returns a Tree with the current contents of the repository's working
+    /// Returns a Index with the current contents of the repository's working
     /// tree, as though everything inside of it had been committed on top of
     /// the current head. Submodules are skipped with a warning logged.
     ///
+    /// These changes can be written back to the repository index on disk with
+    /// [`Index::write`], or converted into a [`Tree`] with
+    /// [`Index::write_tree`].
+    ///
     /// # Panics
     ///
-    /// If the repository is bare (per [Repository::is_bare]).
+    /// If the repository is bare (per [`Repository::is_bare`]).
     #[instrument(level = "debug", skip_all)]
     #[must_use]
-    fn working_tree(&self) -> Tree {
+    fn working_index(&self) -> Result<Index> {
         let repo: &Repository = self.borrow();
 
         if repo.is_bare() {
             panic!("Repository is bare!");
         }
 
-        todo!()
+        let mut index = repo.index()?;
+        index
+            .add_all(
+                ["*"],
+                Default::default(),
+                Some(&mut |path, _| {
+                    if path.to_string_lossy().ends_with('/') {
+                        let mut git_path = PathBuf::from(path);
+                        git_path.push(".git");
+                        if git_path.is_dir() {
+                            warn!(
+                                "Encountered a Git submodule; skipping it: {}",
+                                git_path.to_string_lossy()
+                            );
+                            return 1;
+                        }
+                    }
+                    trace!("Adding: {}", path.to_string_lossy());
+                    0
+                }),
+            )
+            .wrap_err("Failed to add something to the Git index.")?;
+        Ok(index)
     }
 }
 
 impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 
-/// Extension methods for [`git2::Commit`].
+/// Extension methods for [`Commit`].
 ///
 /// These methods are all non-destructive: although new objects may be written
 /// to the local Git database, nothing will be modified to point to them, nor
@@ -44,7 +78,7 @@ impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// Returns the raw contents of the underlying Git commit object.
     ///
-    /// This is similar to [`git2::Repository::commit_create_buffer`], but for
+    /// This is similar to [`Repository::commit_create_buffer`], but for
     /// an existing [`Commit`].
     fn to_bytes(&self) -> Vec<u8> {
         let commit: &Commit = self.borrow();
@@ -253,8 +287,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
 impl<'repo, T> CommitExt<'repo> for T where T: Borrow<Commit<'repo>> + Debug {}
 
-/// The commit resulting from a [`Commit::brute_force_timestamps`] call, wrapped
-/// to indicate whether the target prefix was complete or incompletely matched.
+/// The commit resulting from a [`CommitExt::brute_force_timestamps`] call,
+/// wrapped to indicate whether the target prefix was complete or incompletely
+/// matched.
 #[derive(Debug, Clone)]
 #[must_use]
 pub enum BruteForcedCommit<'repo> {
@@ -318,11 +353,11 @@ impl<'repo> BruteForcedCommit<'repo> {
     }
 }
 
-/// Returns the [`git2::Oid`] for a a raw git object body of a given type (such
-/// as "commit" or "blob").
+/// Returns the [`Oid`] for a raw git object body of a given type (such as
+/// `"commit"` or `"blob"`).
 #[instrument(level = "debug")]
 #[must_use]
-pub fn oid(git_type: &str, body: &[u8]) -> Oid {
+pub fn oid(git_type: &'static str, body: &[u8]) -> Oid {
     Oid::from_bytes(
         &sha1::Sha1::new()
             .chain_update(git_type)
@@ -330,8 +365,7 @@ pub fn oid(git_type: &str, body: &[u8]) -> Oid {
             .chain_update(body.len().to_string())
             .chain_update([0x00])
             .chain_update(&body)
-            .finalize()
-            .to_vec(),
+            .finalize(),
     )
     .unwrap()
 }

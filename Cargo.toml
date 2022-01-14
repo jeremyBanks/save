@@ -22,7 +22,7 @@ tag-name = "{{version}}"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--document-private-items"]
-cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples=examples"]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples=all"]
 
 [dependencies.clap]
 features = ["derive", "env", "cargo", "unicode", "wrap_help"]
