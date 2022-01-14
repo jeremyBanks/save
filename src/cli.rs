@@ -1,7 +1,7 @@
 //! CLI logic
 
 use {
-    crate::git::*,
+    crate::git2::*,
     clap::Parser,
     digest::Digest,
     eyre::{bail, Result, WrapErr},
@@ -115,10 +115,6 @@ fn max_term_width() -> usize {
 /// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
-    if args.squash_commits > 0 {
-        todo!("--squash has not been implemented");
-    }
-
     let mut target_hash = args
         .hash_hex
         .as_ref()

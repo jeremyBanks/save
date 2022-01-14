@@ -1,6 +1,7 @@
-//! Some helper methods for working with [git2].
+//! Some helpers for working with [`git2`].
 
 use {
+    digest::Digest,
     git2::{Commit, Oid, Repository, Tree},
     std::{borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug, rc::Rc},
     thousands::Separable,
@@ -41,6 +42,32 @@ impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 /// to the local Git database, nothing will be modified to point to them, nor
 /// will the index or working tree be modified.
 pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
+    /// Returns the raw contents of the underlying Git commit object.
+    ///
+    /// This is similar to [`git2::Repository::commit_create_buffer`], but for
+    /// an existing [`Commit`].
+    fn to_bytes(&self) -> Vec<u8> {
+        let commit: &Commit = self.borrow();
+        let header_bytes = commit.raw_header_bytes();
+        let message_bytes_raw = commit.message_raw_bytes();
+
+        let mut buffer = Vec::with_capacity(header_bytes.len() + 1 + message_bytes_raw.len());
+        buffer.extend(header_bytes);
+        buffer.push(b'\n');
+        buffer.extend(message_bytes_raw);
+
+        if cfg!(debug_assertions) {
+            let digest = oid("commit", &buffer);
+            let id = commit.id();
+            assert_eq!(
+                digest, id,
+                "to_bytes produced a commit object with the wrong hash"
+            );
+        }
+
+        buffer
+    }
+
     /// Finds the generation number of this commit.
     ///
     /// The generation index is the number of edges of the longest path between
@@ -220,7 +247,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
         let _ = (min_timestamp, max_timestamp);
 
-        todo!()
+        todo!("create a commit")
     }
 }
 
@@ -263,7 +290,7 @@ impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
 impl<'repo> BruteForcedCommit<'repo> {
     /// Returns a reference to the underlying [`Commit`].
     #[must_use]
-    pub fn commit(&self) -> &Commit<'repo> {
+    pub const fn commit(&self) -> &Commit<'repo> {
         match self {
             BruteForcedCommit::Complete { commit }
             | BruteForcedCommit::Incomplete { commit, .. } => commit,
@@ -273,7 +300,7 @@ impl<'repo> BruteForcedCommit<'repo> {
     /// Returns a reference to the underlying [`Commit`] if it is a complete
     /// match.
     #[must_use]
-    pub fn complete(self) -> Option<Commit<'repo>> {
+    pub const fn complete(&self) -> Option<&Commit<'repo>> {
         match self {
             BruteForcedCommit::Complete { commit } => Some(commit),
             _ => None,
@@ -283,10 +310,28 @@ impl<'repo> BruteForcedCommit<'repo> {
     /// Returns a reference to the underlying [`Commit`] if it is not a complete
     /// match.
     #[must_use]
-    pub fn incomplete(&self) -> Option<&Commit<'repo>> {
+    pub const fn incomplete(&self) -> Option<&Commit<'repo>> {
         match self {
             BruteForcedCommit::Incomplete { commit, .. } => Some(commit),
             _ => None,
         }
     }
+}
+
+/// Returns the [`git2::Oid`] for a a raw git object body of a given type (such
+/// as "commit" or "blob").
+#[instrument(level = "debug")]
+#[must_use]
+pub fn oid(git_type: &str, body: &[u8]) -> Oid {
+    Oid::from_bytes(
+        &sha1::Sha1::new()
+            .chain_update(git_type)
+            .chain_update(" ")
+            .chain_update(body.len().to_string())
+            .chain_update([0x00])
+            .chain_update(&body)
+            .finalize()
+            .to_vec(),
+    )
+    .unwrap()
 }

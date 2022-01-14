@@ -1,4 +1,3 @@
-fn main() -> Result<(), Box<dyn ::std::error::Error>> {
-    let args = save::cli::init();
-    Ok(save::cli::main(args)?)
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Ok(save::cli::main(save::cli::init())?)
 }

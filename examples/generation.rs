@@ -1,4 +1,4 @@
-use {eyre::Result, git2::Repository, save::git::CommitExt};
+use {eyre::Result, git2::Repository, save::git2::CommitExt};
 
 fn main() -> Result<()> {
     let repo = Repository::open_from_env()?;

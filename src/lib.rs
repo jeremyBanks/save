@@ -35,6 +35,8 @@
     clippy::large_digit_groups,
     clippy::manual_filter_map,
     clippy::match_same_arms,
+    clippy::missing_const_for_fn,
+    clippy::missing_enforced_import_renames,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
     clippy::missing_safety_doc,
@@ -49,7 +51,9 @@
     clippy::redundant_closure_for_method_calls,
     clippy::semicolon_if_nothing_returned,
     clippy::single_match_else,
+    clippy::todo,
     clippy::unicode_not_nfc,
+    clippy::unimplemented,
     clippy::unnecessary_unwrap,
     clippy::unreadable_literal,
     clippy::unseparated_literal_suffix,
@@ -58,4 +62,4 @@
 )]
 
 pub mod cli;
-pub mod git;
+pub mod git2;
