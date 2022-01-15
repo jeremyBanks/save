@@ -7,7 +7,6 @@ include = ["/src/**.rs", "examples/**.rs", "/*.toml", "/*.md", "/scripts/*"]
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
-resolver = "2"
 version = "0.6.0-dev"
 
 [features]
