@@ -6,14 +6,16 @@ pub(self) use git2::{
     Signature, Tag, Tree,
 };
 use {
-    digest::{consts::U20, generic_array::GenericArray, Digest},
+    digest::{generic_array::GenericArray, Digest},
     eyre::{Context, Result},
+    petgraph as _,
     std::{
         borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug,
         intrinsics::transmute, path::PathBuf, rc::Rc,
     },
     thousands::Separable,
     tracing::{debug, debug_span, info, instrument, trace, warn},
+    typenum::U20,
 };
 
 /// Extension methods for [`Repository`].

@@ -974,6 +974,7 @@ dependencies = [
  "tracing",
  "tracing-error",
  "tracing-subscriber",
+ "typenum",
 ]
 
 [[package]]

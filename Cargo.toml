@@ -33,6 +33,11 @@ thousands = "0.2.0"
 tracing = { features = ["log"], version = "0.1.29" }
 tracing-error = { features = ["traced-error"], version = "0.2.0" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.6" }
+typenum = "1.15.0"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
 
 [[bench]]
 name = "criterion"
@@ -46,10 +51,6 @@ harness = false
 criterion = { features = ["html_reports"], version = "0.3.5" }
 crossterm = "0.22.1"
 iai = "0.1.1"
-
-[profile.release]
-lto = "fat"
-codegen-units = 1
 
 [package.metadata.release]
 allow-branch = ["trunk"]
