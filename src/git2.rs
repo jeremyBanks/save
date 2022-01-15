@@ -1,16 +1,16 @@
-//! Helpers extending [`::git2`].
+//! Helpers for [`::git2`].
 
 #[allow(unused)]
-pub(crate) use git2::{
-    Blob, Branch, Commit, Config, Index, Object, Oid, Reference, Remote, Repository, Signature,
-    Tag, Tree,
+pub(self) use git2::{
+    Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
+    Signature, Tag, Tree,
 };
 use {
-    digest::Digest,
+    digest::{consts::U20, generic_array::GenericArray, Digest},
     eyre::{Context, Result},
     std::{
-        borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug, path::PathBuf,
-        rc::Rc,
+        borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug,
+        intrinsics::transmute, path::PathBuf, rc::Rc,
     },
     thousands::Separable,
     tracing::{debug, debug_span, info, instrument, trace, warn},
@@ -85,13 +85,13 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         let header_bytes = commit.raw_header_bytes();
         let message_bytes_raw = commit.message_raw_bytes();
 
-        let mut buffer = Vec::with_capacity(header_bytes.len() + 1 + message_bytes_raw.len());
-        buffer.extend(header_bytes);
-        buffer.push(b'\n');
-        buffer.extend(message_bytes_raw);
+        let mut body = Vec::with_capacity(header_bytes.len() + 1 + message_bytes_raw.len());
+        body.extend(header_bytes);
+        body.push(b'\n');
+        body.extend(message_bytes_raw);
 
         if cfg!(debug_assertions) {
-            let digest = oid("commit", &buffer);
+            let digest = Oid::for_object("commit", &body);
             let id = commit.id();
             assert_eq!(
                 digest, id,
@@ -99,7 +99,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             );
         }
 
-        buffer
+        body
     }
 
     /// Finds the generation number of this commit.
@@ -116,12 +116,12 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
         #[derive(Debug, Clone)]
         struct CommitNode {
-            /// number of edges (git children) whose distances hasn't been
-            /// accounted-for yet
+            /// Number of edges (Git children) whose distances hasn't been
+            /// accounted-for yet.
             unaccounted_edges_in: u32,
-            /// max distance from head of accounted-for edges
+            /// Max distance from head of accounted-for edges.
             max_distance_from_head: u32,
-            /// git parents of this node
+            /// Git parents of this node.
             edges_out: Vec<Rc<RefCell<CommitNode>>>,
         }
 
@@ -353,19 +353,31 @@ impl<'repo> BruteForcedCommit<'repo> {
     }
 }
 
-/// Returns the [`Oid`] for a raw git object body of a given type (such as
-/// `"commit"` or `"blob"`).
-#[instrument(level = "debug")]
-#[must_use]
-pub fn oid(git_type: &'static str, body: &[u8]) -> Oid {
-    Oid::from_bytes(
-        &sha1::Sha1::new()
-            .chain_update(git_type)
+/// Extension methods for [`Oid`].
+pub trait OidExt: Borrow<Oid> + Debug {
+    /// This is similar to [`Oid::from_bytes`], but taking an array instead of a
+    /// slice.
+    #[allow(unsafe_code)]
+    #[must_use]
+    fn from_array(oid: [u8; 20]) -> Oid {
+        // An `Oid` is a simple data type with the same internal representation
+        // as a `[u8; 20]` internally. However, all of the external interfaces
+        // for creating an `Oid` have some amount of unnecessary overhead.
+        unsafe { transmute(oid) }
+    }
+
+    /// This is similar to [`Oid::hash_object`], but *potentially* a bit faster.
+    #[must_use]
+    fn for_object(object_type: &'static str, body: &[u8]) -> Oid {
+        let oid: GenericArray<u8, U20> = sha1::Sha1::new()
+            .chain_update(object_type)
             .chain_update(" ")
             .chain_update(body.len().to_string())
             .chain_update([0x00])
             .chain_update(&body)
-            .finalize(),
-    )
-    .unwrap()
+            .finalize();
+        Oid::from_array(oid.into())
+    }
 }
+
+impl<T> OidExt for T where T: Borrow<Oid> + Debug {}
