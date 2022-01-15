@@ -1,4 +1,4 @@
-use criterion::*;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_hash_object(c: &mut Criterion) {
     c.bench_function("git2::Oid::hash_thing", |b| b.iter(|| (black_box(20))));

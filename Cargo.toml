@@ -35,11 +35,17 @@ tracing-error = { features = ["traced-error"], version = "0.2.0" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.6" }
 
 [[bench]]
-name = "benches"
+name = "criterion"
+harness = false
+
+[[bench]]
+name = "iai"
 harness = false
 
 [dev-dependencies]
 criterion = { features = ["html_reports"], version = "0.3.5" }
+crossterm = "0.22.1"
+iai = "0.1.1"
 
 [profile.release]
 lto = "fat"

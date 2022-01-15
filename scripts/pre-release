@@ -5,5 +5,5 @@ cd "$(dirname "$0")/.."
 
 cargo clippy --fix --allow-dirty
 cargo +nightly fmt
-cargo msrv
+cargo test
 INSTALL_VERSION="$NEW_VERSION" scripts/readme
