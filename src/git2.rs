@@ -355,8 +355,7 @@ impl<'repo> BruteForcedCommit<'repo> {
 
 /// Extension methods for [`Oid`].
 pub trait OidExt: Borrow<Oid> + Debug {
-    /// This is similar to [`Oid::from_bytes`], but taking an array instead of a
-    /// slice.
+    /// This is similar to [`Oid::from_bytes`], but *potentially* a bit faster.
     #[allow(unsafe_code)]
     #[must_use]
     fn from_array(oid: [u8; 20]) -> Oid {

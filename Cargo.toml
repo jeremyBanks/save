@@ -10,6 +10,42 @@ repository = "https://github.com/jeremyBanks/save"
 resolver = "2"
 version = "0.6.0-dev"
 
+[features]
+default = []
+
+[lib]
+name = "save"
+
+[[bin]]
+name = "save"
+
+[dependencies]
+clap = { features = ["derive", "env", "cargo", "unicode", "wrap_help"], version = "3.0.7" }
+color-eyre = "0.6.0"
+digest = "0.10.1"
+eyre = "0.6.5"
+git2 = "0.13.25"
+hex = "0.4.3"
+home = "0.5.3"
+petgraph = "0.6.0"
+rayon = "1.5.1"
+sha-1 = "0.10.0"
+thousands = "0.2.0"
+tracing = { features = ["log"], version = "0.1.29" }
+tracing-error = { features = ["traced-error"], version = "0.2.0" }
+tracing-subscriber = { features = ["env-filter"], version = "0.3.6" }
+
+[[bench]]
+name = "benches"
+harness = false
+
+[dev-dependencies]
+criterion = { features = ["html_reports"], version = "0.3.5" }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
 [package.metadata.release]
 allow-branch = ["trunk"]
 dev-version = true
@@ -23,46 +59,3 @@ tag-name = "{{version}}"
 [package.metadata.docs.rs]
 rustdoc-args = ["--document-private-items"]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples=all"]
-
-[dependencies.clap]
-features = ["derive", "env", "cargo", "unicode", "wrap_help"]
-version = "3.0.4"
-
-[dependencies.color-eyre]
-version = "0.5.11"
-
-[dependencies.digest]
-version = "0.10.1"
-
-[dependencies.eyre]
-version = "0.6.5"
-
-[dependencies.git2]
-version = "0.13.25"
-
-[dependencies.hex]
-version = "0.4.3"
-
-[dependencies.home]
-version = "0.5.3"
-
-[dependencies.rayon]
-version = "1.5.1"
-
-[dependencies.sha-1]
-version = "0.10.0"
-
-[dependencies.thousands]
-version = "0.2.0"
-
-[dependencies.tracing]
-features = ["log"]
-version = "0.1.29"
-
-[dependencies.tracing-error]
-features = ["traced-error"]
-version = "0.1.2"
-
-[dependencies.tracing-subscriber]
-version = "0.2.5"
-
