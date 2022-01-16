@@ -110,7 +110,8 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// The generation index is the number of edges of the longest path between
     /// the given commit and an initial commit (one with no parents, which
     /// has an implicit generation index of 0). The Git documentation also
-    /// refers to this as the "topological level" of a commit (<https://git-scm.com/docs/commit-graph>).
+    /// refers to this as the "topological level" of a commit
+    /// (<https://git-scm.com/docs/commit-graph>).
     #[instrument(level = "debug")]
     #[must_use]
     fn generation_number(&self) -> u32 {
@@ -228,6 +229,19 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         generation_number
     }
 
+    /// Finds the generation number of this commit.
+    ///
+    /// The generation index is the number of edges of the longest path between
+    /// the given commit and an initial commit (one with no parents, which
+    /// has an implicit generation index of 0). The Git documentation also
+    /// refers to this as the "topological level" of a commit
+    /// (<https://git-scm.com/docs/commit-graph>).
+    #[instrument(level = "debug")]
+    #[must_use]
+    fn generation_number_via_petgraph(&self) -> u32 {
+        todo!()
+    }
+
     /// Returns a new Commit with the result of squashing this commit with it
     /// `depth` first-parent ancestors, and any merged-in descendant
     /// branches.
@@ -276,6 +290,8 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             .into()
             .unwrap_or_else(|| commit.author().when().seconds());
 
+        // TODO: actually short-circuit on full matches so this isn't always an infinite
+        // loop
         let max_timestamp = max_timestamp.into().unwrap_or(i64::MAX);
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
@@ -463,7 +479,7 @@ impl<'repo> BruteForcedCommit<'repo> {
 
 /// Extension methods for [`Oid`].
 pub trait OidExt: Borrow<Oid> + Debug {
-    /// This is similar to [`Oid::from_bytes`], but potentially faster.
+    /// This is similar to [`Oid::from_bytes`], but faster.
     #[allow(unsafe_code)]
     #[must_use]
     fn from_array(bytes: [u8; 20]) -> Oid {
@@ -478,7 +494,7 @@ pub trait OidExt: Borrow<Oid> + Debug {
         oid
     }
 
-    /// This is similar to [`Oid::hash_object`], but potentially faster.
+    /// This is similar to [`Oid::hash_object`], but faster.
     #[must_use]
     fn for_object(object_type: &'static str, body: &[u8]) -> Oid {
         let oid: GenericArray<u8, U20> = sha1::Sha1::new()
