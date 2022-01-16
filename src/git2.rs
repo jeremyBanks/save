@@ -9,6 +9,7 @@ use {
     digest::{generic_array::GenericArray, Digest},
     eyre::{Context, Result},
     petgraph as _,
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::{
         borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug,
         intrinsics::transmute, path::PathBuf, rc::Rc,
@@ -273,17 +274,87 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         let min_timestamp = min_timestamp
             .into()
             .unwrap_or_else(|| commit.author().when().seconds());
+
+        // i64::MAX is infinity for our purposes. Even at an unrealistic
+        // 1 nanosecond per hash, it would take hundreds of years to search the
+        // entire thing, and that time is squared since we're doing so for both.
         let max_timestamp = max_timestamp.into().unwrap_or(i64::MAX);
 
-        if target_prefix.is_empty() {
-            return BruteForcedCommit::Complete {
-                commit: commit.clone(),
-            };
-        }
+        let base_commit = String::from_utf8(self.to_bytes()).unwrap();
 
-        let _ = (min_timestamp, max_timestamp);
+        let base_commit_lines = base_commit.split('\n').collect::<Vec<&str>>();
+        let author_line_index = base_commit_lines
+            .iter()
+            .position(|line| line.starts_with("author "))
+            .expect("author line missing in commit");
+        let author_line_pieces = &base_commit_lines[author_line_index]
+            .split(' ')
+            .collect::<Vec<_>>();
+        let committer_line_index = base_commit_lines
+            .iter()
+            .position(|line| line.starts_with("committer "))
+            .expect("committer line missing in commit");
+        let committer_line_pieces = &base_commit_lines[committer_line_index]
+            .split(' ')
+            .collect::<Vec<_>>();
 
-        todo!("create a commit")
+        let commit_create_buffer = |author_timestamp: i64, committer_timestamp: i64| {
+            let mut commit_lines = base_commit_lines.clone();
+
+            let mut author_line_pieces = author_line_pieces.clone();
+            let i = author_line_pieces.len() - 2;
+            let author_timestamp = author_timestamp.to_string();
+            author_line_pieces[i] = &author_timestamp;
+            let author_line = author_line_pieces.join(" ");
+            commit_lines[author_line_index] = &author_line;
+
+            let mut committer_line_pieces = committer_line_pieces.clone();
+            let i = committer_line_pieces.len() - 2;
+            let committer_timestamp = committer_timestamp.to_string();
+            committer_line_pieces[i] = &committer_timestamp;
+            let committer_line = committer_line_pieces.join(" ");
+            commit_lines[committer_line_index] = &committer_line;
+
+            commit_lines.join("\n")
+        };
+
+        let commit = ((min_timestamp..=max_timestamp)
+            .into_par_iter()
+            .map(|author_timestamp| {
+                (author_timestamp..=max_timestamp)
+                    .into_par_iter()
+                    .map(|commit_timestamp| {
+                        let candidate = commit_create_buffer(author_timestamp, commit_timestamp);
+                        let hash = sha1::Sha1::new()
+                            .chain_update(format!("commit {}", candidate.len()))
+                            .chain_update([0x00])
+                            .chain_update(&candidate)
+                            .finalize()
+                            .to_vec();
+
+                        let score = hash
+                            .iter()
+                            .zip(target_prefix.iter())
+                            .map(|(a, b)| (a ^ b))
+                            .collect::<Vec<u8>>();
+
+                        (score, author_timestamp, commit_timestamp, hash, candidate)
+                    })
+                    .min()
+                    .unwrap()
+            }))
+        .min()
+        .unwrap();
+
+        debug!(
+            "Brute-forced a commit with id: {}",
+            hash.iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join("")
+        );
+
+        BruteForcedCommit::Incomplete { commit }
     }
 }
 
@@ -304,8 +375,6 @@ pub enum BruteForcedCommit<'repo> {
     Incomplete {
         /// The resulting commit.
         commit: Commit<'repo>,
-        /// The number of leading bits of the commit ID that match the target.
-        matched_bits: u8,
     },
 }
 
@@ -318,7 +387,7 @@ impl<'repo> Borrow<Commit<'repo>> for BruteForcedCommit<'repo> {
 impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
     fn from(commit: BruteForcedCommit<'repo>) -> Self {
         match commit {
-            BruteForcedCommit::Complete { commit }
+            BruteForcedCommit::Complete { commit, .. }
             | BruteForcedCommit::Incomplete { commit, .. } => commit,
         }
     }
@@ -329,7 +398,7 @@ impl<'repo> BruteForcedCommit<'repo> {
     #[must_use]
     pub const fn commit(&self) -> &Commit<'repo> {
         match self {
-            BruteForcedCommit::Complete { commit }
+            BruteForcedCommit::Complete { commit, .. }
             | BruteForcedCommit::Incomplete { commit, .. } => commit,
         }
     }
@@ -339,7 +408,7 @@ impl<'repo> BruteForcedCommit<'repo> {
     #[must_use]
     pub const fn complete(&self) -> Option<&Commit<'repo>> {
         match self {
-            BruteForcedCommit::Complete { commit } => Some(commit),
+            BruteForcedCommit::Complete { commit, .. } => Some(commit),
             _ => None,
         }
     }
@@ -360,11 +429,16 @@ pub trait OidExt: Borrow<Oid> + Debug {
     /// This is similar to [`Oid::from_bytes`], but *potentially* a bit faster.
     #[allow(unsafe_code)]
     #[must_use]
-    fn from_array(oid: [u8; 20]) -> Oid {
+    fn from_array(bytes: [u8; 20]) -> Oid {
         // An `Oid` is a simple data type with the same internal representation
-        // as a `[u8; 20]` internally. However, all of the external interfaces
+        // as a `[u8; 20]` internally. However, all of the public interfaces
         // for creating an `Oid` have some amount of unnecessary overhead.
-        unsafe { transmute(oid) }
+        let oid: Oid = unsafe { transmute(bytes) };
+        if cfg!(debug_assertions) {
+            let expected = Oid::from_bytes(&bytes).unwrap();
+            assert_eq!(expected, oid);
+        }
+        oid
     }
 
     /// This is similar to [`Oid::hash_object`], but *potentially* a bit faster.
@@ -377,7 +451,14 @@ pub trait OidExt: Borrow<Oid> + Debug {
             .chain_update([0x00])
             .chain_update(&body)
             .finalize();
-        Oid::from_array(oid.into())
+        let oid: [u8; 20] = oid.into();
+        let oid = Oid::from_array(oid);
+        if cfg!(debug_assertions) {
+            let expected =
+                Oid::hash_object(ObjectType::from_str(object_type).unwrap(), body).unwrap();
+            assert_eq!(expected, oid);
+        }
+        oid
     }
 }
 

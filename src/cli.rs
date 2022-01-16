@@ -3,14 +3,11 @@
 use {
     crate::git2::*,
     clap::Parser,
-    digest::Digest,
     eyre::{bail, Result, WrapErr},
     git2::{
-        Commit, ErrorCode, Index, Repository, RepositoryInitOptions, RepositoryState, Signature,
-        Time,
+        Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
     },
-    rayon::prelude::*,
-    std::{env, fs, path::PathBuf, process::Command},
+    std::{env, fs, process::Command},
     tracing::{debug, info, instrument, trace, warn},
 };
 
@@ -138,7 +135,7 @@ pub fn main(args: Args) -> Result<()> {
         .map(|commit| commit.generation_number() + 1)
         .unwrap_or(0);
 
-    let mut index = new_index(&repo)?;
+    let mut index = repo.working_index()?;
 
     let tree = index.write_tree()?;
 
@@ -243,11 +240,6 @@ pub fn main(args: Args) -> Result<()> {
     Ok(())
 }
 
-#[instrument(level = "debug", skip(_repo))]
-fn squashed_commit<'a>(_repo: &'a mut Repository, _head: &'a Commit, _depth: usize) -> Commit<'a> {
-    todo!();
-}
-
 /// Determine the Git user name and email to use.
 #[instrument(level = "debug", skip(repo))]
 fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
@@ -318,34 +310,6 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
     Ok((user_name, user_email))
 }
 
-/// Generates an updated [git2::Index] with every file in the directory.
-#[instrument(level = "debug", skip(repo))]
-fn new_index(repo: &Repository) -> Result<Index> {
-    let mut index = repo.index()?;
-    index
-        .add_all(
-            ["*"],
-            Default::default(),
-            Some(&mut |path, _| {
-                if path.to_string_lossy().ends_with('/') {
-                    let mut git_path = PathBuf::from(path);
-                    git_path.push(".git");
-                    if git_path.is_dir() {
-                        warn!(
-                            "Encountered a Git submodule; skipping it: {}",
-                            git_path.to_string_lossy()
-                        );
-                        return 1;
-                    }
-                }
-                trace!("Adding: {}", path.to_string_lossy());
-                0
-            }),
-        )
-        .wrap_err("Failed to add something to the Git index.")?;
-    Ok(index)
-}
-
 /// Opens or initializes a new [git2::Repository] in CWD or GIT_DIR, if args
 /// allow it.
 #[instrument(level = "debug")]
@@ -398,95 +362,6 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
     }
 
     Ok(repo)
-}
-
-/// Brute forces timestamps for a raw Git commit.
-///
-/// Given a raw Git commit as a string, finds the timestamps in the given range
-/// that will produce the closest commit ID to target_hash. We search possible
-/// commits where
-/// `min_timestamp <= author_timestamp <= committer_timestamp <= max_timestamp`.
-#[instrument(level = "debug")]
-pub fn brute_force_timestamps(
-    base_commit: &str,
-    target_hash: &[u8],
-    min_timestamp: i64,
-    max_timestamp: i64,
-) -> (i64, i64) {
-    let base_commit_lines = base_commit.split('\n').collect::<Vec<&str>>();
-    let author_line_index = base_commit_lines
-        .iter()
-        .position(|line| line.starts_with("author "))
-        .expect("author line missing in commit");
-    let author_line_pieces = &base_commit_lines[author_line_index]
-        .split(' ')
-        .collect::<Vec<_>>();
-    let committer_line_index = base_commit_lines
-        .iter()
-        .position(|line| line.starts_with("committer "))
-        .expect("committer line missing in commit");
-    let committer_line_pieces = &base_commit_lines[committer_line_index]
-        .split(' ')
-        .collect::<Vec<_>>();
-
-    let commit_create_buffer = |author_timestamp: i64, committer_timestamp: i64| {
-        let mut commit_lines = base_commit_lines.clone();
-
-        let mut author_line_pieces = author_line_pieces.clone();
-        let i = author_line_pieces.len() - 2;
-        let author_timestamp = author_timestamp.to_string();
-        author_line_pieces[i] = &author_timestamp;
-        let author_line = author_line_pieces.join(" ");
-        commit_lines[author_line_index] = &author_line;
-
-        let mut committer_line_pieces = committer_line_pieces.clone();
-        let i = committer_line_pieces.len() - 2;
-        let committer_timestamp = committer_timestamp.to_string();
-        committer_line_pieces[i] = &committer_timestamp;
-        let committer_line = committer_line_pieces.join(" ");
-        commit_lines[committer_line_index] = &committer_line;
-
-        commit_lines.join("\n")
-    };
-
-    let (_score, author_timestamp, commit_timestamp, hash, _candidate) = ((min_timestamp
-        ..=max_timestamp)
-        .into_par_iter()
-        .map(|author_timestamp| {
-            (author_timestamp..=max_timestamp)
-                .into_par_iter()
-                .map(|commit_timestamp| {
-                    let candidate = commit_create_buffer(author_timestamp, commit_timestamp);
-                    let hash = sha1::Sha1::new()
-                        .chain_update(format!("commit {}", candidate.len()))
-                        .chain_update([0x00])
-                        .chain_update(&candidate)
-                        .finalize()
-                        .to_vec();
-
-                    let score = hash
-                        .iter()
-                        .zip(target_hash.iter())
-                        .map(|(a, b)| (a ^ b))
-                        .collect::<Vec<u8>>();
-
-                    (score, author_timestamp, commit_timestamp, hash, candidate)
-                })
-                .min()
-                .unwrap()
-        }))
-    .min()
-    .unwrap();
-
-    debug!(
-        "Brute-forced a commit with id: {}",
-        hash.iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<Vec<_>>()
-            .join("")
-    );
-
-    (author_timestamp, commit_timestamp)
 }
 
 /// Initialize the typical global environment and parses the typical [Args] for
