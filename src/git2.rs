@@ -11,7 +11,7 @@ use {
     itertools::Itertools,
     petgraph::{
         graphmap::DiGraphMap,
-        visit::{IntoEdgesDirected, Topo, Visitable, Walker},
+        visit::{IntoEdgesDirected, Topo, Walker},
         EdgeDirection::{Incoming, Outgoing},
     },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
