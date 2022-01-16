@@ -1033,6 +1033,7 @@ dependencies = [
  "hex",
  "home",
  "iai",
+ "itertools",
  "petgraph",
  "rand",
  "rand_pcg",

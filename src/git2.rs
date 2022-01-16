@@ -8,7 +8,13 @@ pub(self) use git2::{
 use {
     digest::{generic_array::GenericArray, Digest},
     eyre::{Context, Result},
-    petgraph as _,
+    itertools::Itertools,
+    petgraph as _::{
+        self as _,
+        graphmap::DiGraphMap,
+        visit::{IntoEdgesDirected, Topo, Visitable, Walker},
+        EdgeDirection::{Incoming, Outgoing},
+    },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::{
         borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug,
@@ -20,10 +26,6 @@ use {
 };
 
 /// Extension methods for [`Repository`].
-///
-/// These methods are all non-destructive: although new objects may be written
-/// to the local Git database, nothing will be modified to point to them, nor
-/// will the index or working tree be modified.
 pub trait RepositoryExt: Borrow<Repository> {
     /// Returns a Index with the current contents of the repository's working
     /// tree, as though everything inside of it had been committed on top of
@@ -74,10 +76,6 @@ pub trait RepositoryExt: Borrow<Repository> {
 impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 
 /// Extension methods for [`Commit`].
-///
-/// These methods are all non-destructive: although new objects may be written
-/// to the local Git database, nothing will be modified to point to them, nor
-/// will the index or working tree be modified.
 pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     /// Returns the raw contents of the underlying Git commit object.
     ///
@@ -226,6 +224,11 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             generation_number
         };
 
+        if cfg!(debug_assertions) {
+            let via_petgraph = self.generation_number_via_petgraph();
+            assert_eq!(via_petgraph, generation_number);
+        }
+
         generation_number
     }
 
@@ -239,7 +242,57 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     #[instrument(level = "debug")]
     #[must_use]
     fn generation_number_via_petgraph(&self) -> u32 {
-        todo!()
+        let commit: &Commit = self.borrow();
+
+        // Git commit graph as petgraph:
+        // - nodes are the commit Oids
+        // - edges are directed from children to parent commits
+        // - edges "weights" are to be their distance from head, starting with 0
+        let mut graph = DiGraphMap::<Oid, u32>::new();
+
+        let mut heads: Vec<Commit> = vec![commit.clone()];
+        while !heads.is_empty() {
+            let head = heads.pop().unwrap();
+            let oid = head.id();
+
+            if graph.edges(oid).count() > 0 {
+                // This has already been walked.
+                // If there are no edges, this either hasn't been walked,
+                // or it's a root node, which we can harmlessly process
+                // again.
+                continue;
+            }
+
+            for parent in head.parents() {
+                graph.add_edge(parent.id(), oid, 0);
+                heads.push(parent.clone());
+            }
+        }
+
+        let mut visitor = Topo::new(&graph);
+        let mut global_maximum_weight = 0;
+        while let Some(node) = visitor.next(&graph) {
+            let max_incoming_weight = graph
+                .edges_directed(node, Incoming)
+                .map(|(_, _, weight)| *weight)
+                .max();
+            let outgoing_weight = max_incoming_weight.map(|n| n + 1).unwrap_or(0);
+
+            let parents = graph
+                .edges_directed(node, Outgoing)
+                .map(|(a, b, w)| (a, b, *w))
+                .collect_vec();
+            for (a, b, existing_weight) in parents {
+                if outgoing_weight > existing_weight {
+                    graph[(a, b)] = outgoing_weight;
+                    if outgoing_weight > global_maximum_weight {
+                        global_maximum_weight = outgoing_weight;
+                    }
+                }
+            }
+        }
+
+        global_maximum_weight
     }
 
     /// Returns a new Commit with the result of squashing this commit with it
@@ -488,13 +541,14 @@ pub trait OidExt: Borrow<Oid> + Debug {
         // for creating an `Oid` have some amount of unnecessary overhead.
         let oid: Oid = unsafe { transmute(bytes) };
         if cfg!(debug_assertions) {
+            // cross-check with git2
             let expected = Oid::from_bytes(&bytes).unwrap();
             assert_eq!(expected, oid);
         }
         oid
     }
 
-    /// This is similar to [`Oid::hash_object`], but faster.
+    /// This is similar to [`Oid::hash_object`], but potentially faster.
     #[must_use]
     fn for_object(object_type: &'static str, body: &[u8]) -> Oid {
         let oid: GenericArray<u8, U20> = sha1::Sha1::new()
@@ -507,6 +561,7 @@ pub trait OidExt: Borrow<Oid> + Debug {
         let oid: [u8; 20] = oid.into();
         let oid = Oid::from_array(oid);
         if cfg!(debug_assertions) {
+            // cross-check with git2
             let expected =
                 Oid::hash_object(ObjectType::from_str(object_type).unwrap(), body).unwrap();
             assert_eq!(expected, oid);

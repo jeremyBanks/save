@@ -81,9 +81,15 @@ fn bench_hash_git_object(c: &mut Criterion) {
     });
 }
 
+fn config() -> Criterion {
+    Criterion::default()
+        .sample_size(64)
+        .measurement_time(Duration::from_secs(16))
+}
+
 criterion_group! {
     name = benches;
-    config = Criterion::default().sample_size(64).measurement_time(Duration::from_secs(16));
+    config = config();
     targets =
         bench_oid_from_bytes,
         bench_hash_git_object,
