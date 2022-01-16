@@ -1,14 +1,24 @@
 use {
     criterion::{black_box, criterion_group, criterion_main, Criterion},
-    git2::{ObjectType, Oid},
+    git2::{ObjectType, Oid, Repository},
     rand::{RngCore, SeedableRng},
     rand_pcg::Pcg64,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
-    save::git2::OidExt,
-    std::time::Duration,
+    save::git2::{OidExt, RepositoryExt, *},
+    std::{ops::Deref, time::Duration},
 };
 
+criterion_main!(benches);
+criterion_group! {
+    benches,
+    bench_oid_from_bytes,
+    bench_hash_git_object,
+    bench_generation_number,
+}
+
 fn bench_oid_from_bytes(c: &mut Criterion) {
+    let mut c = c.benchmark_group("transmuting git ids");
+
     let mut rng = Pcg64::seed_from_u64(0);
     let mut arrays = vec![];
     for _ in 0..8_192 {
@@ -17,9 +27,7 @@ fn bench_oid_from_bytes(c: &mut Criterion) {
         arrays.push(array);
     }
 
-    let mut c = c.benchmark_group("transmute git ids");
-
-    c.bench_function("from_bytes from git2", |b| {
+    c.bench_function("from_bytes (git2)", |b| {
         b.iter(|| {
             for array in arrays.iter() {
                 black_box(Oid::from_bytes(black_box(array))).unwrap();
@@ -27,7 +35,7 @@ fn bench_oid_from_bytes(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("from_array from save", |b| {
+    c.bench_function("from_array (save)", |b| {
         b.iter(|| {
             for array in arrays.iter() {
                 black_box(Oid::from_array(black_box(*array)));
@@ -37,6 +45,9 @@ fn bench_oid_from_bytes(c: &mut Criterion) {
 }
 
 fn bench_hash_git_object(c: &mut Criterion) {
+    let mut c = c.benchmark_group("hashing git objects");
+    c.measurement_time(12 * Duration::from_secs(1));
+
     let mut rng = Pcg64::seed_from_u64(0);
     let mut bodies = vec![];
     for _ in 0..8_192 {
@@ -46,9 +57,7 @@ fn bench_hash_git_object(c: &mut Criterion) {
         bodies.push(body);
     }
 
-    let mut c = c.benchmark_group("hashing git objects");
-
-    c.bench_function("single-threaded hash_object from git2", |b| {
+    c.bench_function("single-threaded hash_object (git2)", |b| {
         b.iter(|| {
             for body in bodies.iter() {
                 black_box(Oid::hash_object(ObjectType::Commit, black_box(body))).unwrap();
@@ -56,7 +65,7 @@ fn bench_hash_git_object(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("single-threaded for_object from save", |b| {
+    c.bench_function("single-threaded for_object (save)", |b| {
         b.iter(|| {
             for body in bodies.iter() {
                 black_box(Oid::for_object("commit", black_box(body)));
@@ -64,7 +73,7 @@ fn bench_hash_git_object(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("rayon-parallel hash_object from git2", |b| {
+    c.bench_function("rayon-parallel hash_object (git2)", |b| {
         b.iter(|| {
             bodies.par_iter().for_each(|body| {
                 black_box(Oid::hash_object(ObjectType::Commit, black_box(body))).unwrap();
@@ -72,7 +81,7 @@ fn bench_hash_git_object(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("rayon-parallel for_object from save", |b| {
+    c.bench_function("rayon-parallel for_object (save)", |b| {
         b.iter(|| {
             bodies.par_iter().for_each(|body| {
                 black_box(Oid::for_object("commit", black_box(body)));
@@ -81,18 +90,25 @@ fn bench_hash_git_object(c: &mut Criterion) {
     });
 }
 
-fn config() -> Criterion {
-    Criterion::default()
-        .sample_size(64)
-        .measurement_time(Duration::from_secs(16))
-}
+fn bench_generation_number(c: &mut Criterion) {
+    let mut c = c.benchmark_group("measuring generation numbers");
 
-criterion_group! {
-    name = benches;
-    config = config();
-    targets =
-        bench_oid_from_bytes,
-        bench_hash_git_object,
+    let mut repo = Repository::temporary().unwrap();
+    // repo.commit(Some("HEAD"), )
+    // TODO: run .save() a bunch of times.
+    // I guess that should be a RepositoryExt method, eh?
 
+    let commit = repo.head().unwrap().peel_to_commit().unwrap();
+
+    c.bench_function("my clunky graph", |b| {
+        b.iter(|| {
+            black_box(black_box(&commit).generation_number());
+        })
+    });
+
+    c.bench_function("my clunky petgraph", |b| {
+        b.iter(|| {
+            black_box(black_box(&commit).generation_number_via_petgraph());
+        })
+    });
 }
-criterion_main!(benches);

@@ -11,17 +11,27 @@ use {
     itertools::Itertools,
     petgraph::{
         graphmap::DiGraphMap,
-        visit::{IntoEdgesDirected, Topo, Walker},
+        visit::Topo,
         EdgeDirection::{Incoming, Outgoing},
     },
+    rand::RngCore,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::{
-        borrow::Borrow, cell::RefCell, cmp::max, collections::HashMap, fmt::Debug,
-        intrinsics::transmute, path::PathBuf, rc::Rc,
+        borrow::Borrow,
+        cell::RefCell,
+        cmp::max,
+        collections::HashMap,
+        fmt::Debug,
+        intrinsics::transmute,
+        ops::{Deref, DerefMut},
+        panic::UnwindSafe,
+        path::PathBuf,
+        rc::Rc,
     },
+    tempfile::TempDir,
     thousands::Separable,
     tracing::{debug, debug_span, info, instrument, trace, warn},
-    typenum::U20,
+    typenum::consts::U20,
 };
 
 /// Extension methods for [`Repository`].
@@ -69,6 +79,73 @@ pub trait RepositoryExt: Borrow<Repository> {
             )
             .wrap_err("Failed to add something to the Git index.")?;
         Ok(index)
+    }
+
+    /// Creates a [`Repository`] backed by a new temporary directory.
+    #[instrument(level = "debug", skip_all)]
+    #[must_use]
+    fn temporary() -> Result<TemporaryRepository> {
+        let dir = TempDir::new()?;
+        let repo = Repository::init(&dir)?;
+
+        Ok(TemporaryRepository { repo, dir })
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    #[must_use]
+    fn dummy_repo(mut rng: impl RngCore) -> Result<TemporaryRepository> {
+        if !cfg!(test) {
+            warn!(
+                "Hi there, hello! This function is only meant for use in tests and may not be \
+                 stable. Okay, thanks, bye now!"
+            );
+        }
+
+        let repo = Repository::temporary()?;
+
+        let _branching_factor = 0.125;
+        let _merging_factor = 0.125;
+
+        rng.fill_bytes(&mut []);
+
+        Ok(repo)
+    }
+}
+
+/// A [`Repository`] in a temporary directory.
+///
+/// Because the backing directory for the repository will be deleted when this
+/// struct is [`Drop`]ped, we don't provide any way to move the [`Repository`]
+/// out, just deref to it.
+///
+/// # Panic Safety
+///
+/// If this isn't dropped, the temporary directory will not be deleted. See
+/// [`TempDir`]'s docs for more information.
+#[must_use]
+pub struct TemporaryRepository {
+    repo: Repository,
+    #[allow(unused)]
+    dir: TempDir,
+}
+
+impl Debug for TemporaryRepository {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TemporaryRepository {{ at {:?} }}", self.repo.path())
+    }
+}
+
+impl Deref for TemporaryRepository {
+    type Target = Repository;
+
+    fn deref(&self) -> &Repository {
+        &self.repo
+    }
+}
+
+impl DerefMut for TemporaryRepository {
+    fn deref_mut(&mut self) -> &mut Repository {
+        &mut self.repo
     }
 }
 
