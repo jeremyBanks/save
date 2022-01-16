@@ -132,7 +132,9 @@ pub fn main(args: Args) -> Result<()> {
 
     let generation_number = head
         .as_ref()
-        .map(|commit| commit.generation_number() + 1)
+        .map(|commit| {
+            (commit.generation_number() + commit.generation_number_via_petgraph()) / 2 + 1
+        })
         .unwrap_or(0);
 
     let mut index = repo.working_index()?;

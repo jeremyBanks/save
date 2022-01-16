@@ -9,8 +9,7 @@ use {
     digest::{generic_array::GenericArray, Digest},
     eyre::{Context, Result},
     itertools::Itertools,
-    petgraph as _::{
-        self as _,
+    petgraph::{
         graphmap::DiGraphMap,
         visit::{IntoEdgesDirected, Topo, Visitable, Walker},
         EdgeDirection::{Incoming, Outgoing},
@@ -224,11 +223,6 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             generation_number
         };
 
-        if cfg!(debug_assertions) {
-            let via_petgraph = self.generation_number_via_petgraph();
-            assert_eq!(via_petgraph, generation_number);
-        }
-
         generation_number
     }
 
@@ -255,7 +249,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             let head = heads.pop().unwrap();
             let oid = head.id();
 
-            if graph.edges(oid).count() > 0 {
+            if graph.edges_directed(oid, Outgoing).count() > 0 {
                 // This has already been walked.
                 // If there are no edges, this either hasn't been walked,
                 // or it's a root node, which we can harmlessly process
@@ -264,10 +258,16 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             }
 
             for parent in head.parents() {
-                graph.add_edge(parent.id(), oid, 0);
+                graph.add_edge(oid, parent.id(), 0);
                 heads.push(parent.clone());
             }
         }
+
+        info!(
+            "Constructed graph with {} nodes and {} edges",
+            graph.node_count(),
+            graph.edge_count()
+        );
 
         let mut visitor = Topo::new(&graph);
         let mut global_maximum_weight = 0;
@@ -275,8 +275,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             let max_incoming_weight = graph
                 .edges_directed(node, Incoming)
                 .map(|(_, _, weight)| *weight)
-                .max();
-            let outgoing_weight = max_incoming_weight.map(|n| n + 1).unwrap_or(0);
+                .max()
+                .unwrap_or_default();
+            let outgoing_weight = max_incoming_weight + 1;
 
             let parents = graph
                 .edges_directed(node, Outgoing)
