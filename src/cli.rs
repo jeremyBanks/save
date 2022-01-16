@@ -206,7 +206,8 @@ pub fn main(args: Args) -> Result<()> {
     )?;
     let base_commit = repo.find_commit(base_commit)?;
 
-    let commit = base_commit.brute_force_timestamps(&target_hash, min_timestamp, max_timestamp);
+    let commit =
+        base_commit.brute_force_timestamps(&repo, &target_hash, min_timestamp, max_timestamp);
 
     let commit = commit.commit();
 

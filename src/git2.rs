@@ -266,6 +266,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
     #[must_use]
     fn brute_force_timestamps(
         &self,
+        repo: &'repo Repository,
         target_prefix: &[u8],
         min_timestamp: impl Into<Option<i64>>,
         max_timestamp: impl Into<Option<i64>>,
@@ -275,9 +276,6 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             .into()
             .unwrap_or_else(|| commit.author().when().seconds());
 
-        // i64::MAX is infinity for our purposes. Even at an unrealistic
-        // 1 nanosecond per hash, it would take hundreds of years to search the
-        // entire thing, and that time is squared since we're doing so for both.
         let max_timestamp = max_timestamp.into().unwrap_or(i64::MAX);
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
@@ -318,43 +316,82 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             commit_lines.join("\n")
         };
 
-        let commit = ((min_timestamp..=max_timestamp)
-            .into_par_iter()
-            .map(|author_timestamp| {
-                (author_timestamp..=max_timestamp)
-                    .into_par_iter()
-                    .map(|commit_timestamp| {
-                        let candidate = commit_create_buffer(author_timestamp, commit_timestamp);
-                        let hash = sha1::Sha1::new()
-                            .chain_update(format!("commit {}", candidate.len()))
-                            .chain_update([0x00])
-                            .chain_update(&candidate)
-                            .finalize()
-                            .to_vec();
+        let (_best_score, best_committer_timestamp, best_author_timestamp, best_oid, best_body) =
+            ((min_timestamp..=max_timestamp)
+                .into_par_iter()
+                .map(|author_timestamp| {
+                    (author_timestamp..=max_timestamp)
+                        .into_par_iter()
+                        .map(|committer_timestamp| {
+                            let candidate_body =
+                                commit_create_buffer(author_timestamp, committer_timestamp);
+                            let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
 
-                        let score = hash
-                            .iter()
-                            .zip(target_prefix.iter())
-                            .map(|(a, b)| (a ^ b))
-                            .collect::<Vec<u8>>();
+                            let score = candidate_oid
+                                .as_bytes()
+                                .iter()
+                                .zip(target_prefix.iter())
+                                .map(|(a, b)| (a ^ b))
+                                .collect::<Vec<u8>>();
 
-                        (score, author_timestamp, commit_timestamp, hash, candidate)
-                    })
-                    .min()
-                    .unwrap()
-            }))
-        .min()
-        .unwrap();
+                            (
+                                score,
+                                committer_timestamp,
+                                author_timestamp,
+                                candidate_oid,
+                                candidate_body,
+                            )
+                        })
+                        .min()
+                        .unwrap()
+                }))
+            .min()
+            .unwrap();
 
-        debug!(
-            "Brute-forced a commit with id: {}",
-            hash.iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<_>>()
-                .join("")
-        );
+        let brute_forced_commit_oid = commit
+            .amend(
+                None,
+                Signature::new(
+                    commit.author().name().unwrap(),
+                    commit.author().email().unwrap(),
+                    &git2::Time::new(
+                        best_author_timestamp,
+                        commit.author().when().offset_minutes(),
+                    ),
+                )
+                .as_ref()
+                .ok(),
+                Signature::new(
+                    commit.committer().name().unwrap(),
+                    commit.committer().email().unwrap(),
+                    &git2::Time::new(
+                        best_committer_timestamp,
+                        commit.committer().when().offset_minutes(),
+                    ),
+                )
+                .as_ref()
+                .ok(),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(best_oid, brute_forced_commit_oid);
 
-        BruteForcedCommit::Incomplete { commit }
+        let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
+        assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
+
+        if best_oid.as_bytes().starts_with(target_prefix) {
+            debug!("Brute-forced a complete prefix match: {best_oid} for {target_prefix:02x?}");
+            BruteForcedCommit::Complete {
+                commit: brute_forced_commit,
+            }
+        } else {
+            debug!("Brute-forced a partial prefix match: {best_oid} for {target_prefix:02x?}");
+            BruteForcedCommit::Incomplete {
+                commit: brute_forced_commit,
+            }
+        }
     }
 }
 
@@ -426,7 +463,7 @@ impl<'repo> BruteForcedCommit<'repo> {
 
 /// Extension methods for [`Oid`].
 pub trait OidExt: Borrow<Oid> + Debug {
-    /// This is similar to [`Oid::from_bytes`], but *potentially* a bit faster.
+    /// This is similar to [`Oid::from_bytes`], but potentially faster.
     #[allow(unsafe_code)]
     #[must_use]
     fn from_array(bytes: [u8; 20]) -> Oid {
@@ -441,7 +478,7 @@ pub trait OidExt: Borrow<Oid> + Debug {
         oid
     }
 
-    /// This is similar to [`Oid::hash_object`], but *potentially* a bit faster.
+    /// This is similar to [`Oid::hash_object`], but potentially faster.
     #[must_use]
     fn for_object(object_type: &'static str, body: &[u8]) -> Oid {
         let oid: GenericArray<u8, U20> = sha1::Sha1::new()
