@@ -3,7 +3,7 @@
 #[allow(unused)]
 pub(self) use git2::{
     Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
-    Signature, Tag, Tree,
+    Signature, Tag, Time, Tree,
 };
 use {
     digest::{generic_array::GenericArray, Digest},
@@ -14,7 +14,6 @@ use {
         visit::Topo,
         EdgeDirection::{Incoming, Outgoing},
     },
-    rand::RngCore,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::{
         borrow::Borrow,
@@ -24,14 +23,13 @@ use {
         fmt::Debug,
         intrinsics::transmute,
         ops::{Deref, DerefMut},
-        panic::UnwindSafe,
         path::PathBuf,
         rc::Rc,
     },
     tempfile::TempDir,
     thousands::Separable,
     tracing::{debug, debug_span, info, instrument, trace, warn},
-    typenum::consts::U20,
+    typenum::U20,
 };
 
 /// Extension methods for [`Repository`].
@@ -91,32 +89,43 @@ pub trait RepositoryExt: Borrow<Repository> {
         Ok(TemporaryRepository { repo, dir })
     }
 
-    #[instrument(level = "debug", skip_all)]
-    #[must_use]
-    fn dummy_repo(mut rng: impl RngCore) -> Result<TemporaryRepository> {
-        if !cfg!(test) {
-            warn!(
-                "Hi there, hello! This function is only meant for use in tests and may not be \
-                 stable. Okay, thanks, bye now!"
-            );
-        }
+    /// Returns a signature for the current repository.
+    fn signature_or_fallback(&self) -> Signature {
+        let repo: &Repository = self.borrow();
+        let _signature = repo.signature();
 
-        let repo = Repository::temporary()?;
+        todo!()
+    }
 
-        let _branching_factor = 0.125;
-        let _merging_factor = 0.125;
+    /// Saves all changes in the working directory to this repository using
+    /// insensible defaults.
+    ///
+    /// # Errors
+    ///
+    /// ?
+    fn save(&self) -> Result<Commit> {
+        let repo: &Repository = self.borrow();
 
-        rng.fill_bytes(&mut []);
-
-        Ok(repo)
+        let mut index = self.working_index()?;
+        let tree = index.write_tree()?;
+        let tree = repo.find_tree(tree)?;
+        let head = repo.head()?.peel_to_commit()?;
+        let signature = repo.signature_or_fallback();
+        let message = "hmm";
+        let commit = repo.commit(None, &signature, &signature, message, &tree, &[&head])?;
+        let commit = repo.find_commit(commit)?;
+        Ok(commit)
     }
 }
+
+impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 
 /// A [`Repository`] in a temporary directory.
 ///
 /// Because the backing directory for the repository will be deleted when this
 /// struct is [`Drop`]ped, we don't provide any way to move the [`Repository`]
-/// out, just deref to it.
+/// out, just deref to it, but we can't stop users from making a mess if they
+/// clone it.
 ///
 /// # Panic Safety
 ///
@@ -148,8 +157,6 @@ impl DerefMut for TemporaryRepository {
         &mut self.repo
     }
 }
-
-impl<T> RepositoryExt for T where T: Borrow<Repository> {}
 
 /// Extension methods for [`Commit`].
 pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
@@ -303,13 +310,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         generation_number
     }
 
-    /// Finds the generation number of this commit.
-    ///
-    /// The generation index is the number of edges of the longest path between
-    /// the given commit and an initial commit (one with no parents, which
-    /// has an implicit generation index of 0). The Git documentation also
-    /// refers to this as the "topological level" of a commit
-    /// (<https://git-scm.com/docs/commit-graph>).
+    /// Testing a different implementation of [`CommitExt::generation_number`].
     #[instrument(level = "debug")]
     #[must_use]
     fn generation_number_via_petgraph(&self) -> u32 {
