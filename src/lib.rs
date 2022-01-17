@@ -57,7 +57,8 @@
     clippy::unreadable_literal,
     clippy::unseparated_literal_suffix,
     clippy::unused_self,
-    clippy::use_self
+    clippy::use_self,
+    clippy::useless_transmute
 )]
 
 pub mod cli;

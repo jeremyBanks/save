@@ -1,0 +1,21 @@
+#!/bin/sh
+set -veuo pipefail
+
+cd "$(dirname "$0")/../test_repos"
+
+repo() {
+    declare name="$1"
+    declare url="$2"
+    [[ -d "$name/.git" ]] || git clone "$url" "$name"
+    cd "$name"
+    git fetch
+    git checkout -f origin/HEAD
+    cd -
+}
+
+set -eux
+
+repo deno       https://github.com/denoland/deno
+repo git        https://github.com/git/git
+repo rust       https://github.com/rust-lang/rust
+repo typescript https://github.com/microsoft/TypeScript

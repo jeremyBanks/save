@@ -1,11 +1,12 @@
 use {
     criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput},
+    eyre::Context,
     git2::{ObjectType, Oid, Repository},
     rand::{RngCore, SeedableRng},
     rand_pcg::Pcg64,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     save::git2::*,
-    std::time::Duration,
+    std::{path::PathBuf, time::Duration},
 };
 
 criterion_main!(benches);
@@ -124,21 +125,26 @@ fn bench_hash_git_object(c: &mut Criterion) {
 fn bench_generation_number(c: &mut Criterion) {
     let mut c = c.benchmark_group("measuring generation numbers");
 
-    let repo =
-        Repository::open_from_env().expect("no git repo available. consider setting GIT_DIR.");
-    let commit = repo.head().unwrap().peel_to_commit().unwrap();
+    let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let test_repos_root = project_root.join("test_repos");
 
-    let generation_number = commit.generation_number();
-    assert_eq!(generation_number, commit.generation_number_via_petgraph());
+    for name in ["deno", "git", "rust", "typescript"] {
+        let repo_path = test_repos_root.join(name);
+        let repo = Repository::open(&repo_path)
+            .wrap_err("you may need to run /scripts/test-repos")
+            .unwrap();
 
-    eprintln!("repo path: {:?}", repo.path());
-    eprintln!("generation number: {}", generation_number);
+        let commit = repo.head().unwrap().peel_to_commit().unwrap();
 
-    c.bench_with_input("my clunky graph", &commit, |b, commit| {
-        b.iter(|| commit.generation_number());
-    });
+        let generation_number = commit.generation_number();
+        assert_eq!(generation_number, commit.generation_number_via_petgraph());
 
-    c.bench_with_input("my clunky petgraph", &commit, |b, commit| {
-        b.iter(|| commit.generation_number_via_petgraph());
-    });
+        c.bench_with_input(format!("{name}/clunky graph"), &commit, |b, commit| {
+            b.iter(|| commit.generation_number());
+        });
+
+        c.bench_with_input(format!("{name}/clunky petgraph"), &commit, |b, commit| {
+            b.iter(|| commit.generation_number_via_petgraph());
+        });
+    }
 }
