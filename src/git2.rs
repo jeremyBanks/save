@@ -393,7 +393,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             return commit.clone();
         }
 
-        let mut merged_commits: HashSet<Oid> = [commit.id()].into();
+        let _merged_commits: HashSet<Oid> = [commit.id()].into();
 
         // let mut tail: Commit = commit.clone();
         // for _ in 0..depth {

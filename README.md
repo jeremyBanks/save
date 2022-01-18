@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save
+$ cargo install save --version 0.6.0-dev.1
 ```
 
 ```sh
@@ -32,8 +32,8 @@ OPTIONS:
             parents]
 
     -n, --dry-run
-            Prepare the commit, but don't actually save anything to
-            disk
+            Prepare the commit, but don't actually update any
+            references in Git
 
         --name <NAME>
             The name to use for the commit's author and committer.

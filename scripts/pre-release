@@ -3,7 +3,6 @@ set -veuo pipefail
 
 cd "$(dirname "$0")/.."
 
-cargo msrv --bisect --ignore-lockfile --include-all-patch-releases --toolchain-file
 cargo clippy --fix --allow-dirty
 cargo +nightly fmt
 cargo test
