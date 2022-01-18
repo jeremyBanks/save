@@ -34,6 +34,7 @@ rayon = "1.5.1"
 sha-1 = "0.10.0"
 sha2 = "0.10.1"
 tempfile = "3.3.0"
+thiserror = "1.0.30"
 thousands = "0.2.0"
 tracing = { features = ["log"], version = "0.1.29" }
 tracing-error = { features = ["traced-error"], version = "0.2.0" }
@@ -48,14 +49,8 @@ codegen-units = 1
 name = "criterion"
 harness = false
 
-[[bench]]
-name = "iai"
-harness = false
-
 [dev-dependencies]
 criterion = { features = ["html_reports"], version = "0.3.5" }
-crossterm = "0.22.1"
-iai = "0.1.1"
 
 [package.metadata.release]
 allow-branch = ["trunk"]

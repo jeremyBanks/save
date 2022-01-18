@@ -137,7 +137,7 @@ pub fn main(args: Args) -> Result<()> {
         })
         .unwrap_or(0);
 
-    let mut index = repo.working_index()?;
+    let mut index = repo.working_index()??;
 
     let tree = index.write_tree()?;
 
