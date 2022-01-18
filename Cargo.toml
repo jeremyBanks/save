@@ -47,6 +47,7 @@ harness = false
 
 [dev-dependencies]
 criterion = { features = ["html_reports"], version = "0.3.5" }
+crossterm = "0.22.1"
 iai = "0.1.1"
 
 [package.metadata.release]

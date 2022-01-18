@@ -395,15 +395,15 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
         let mut merged_commits: HashSet<Oid> = [commit.id()].into();
 
-        let mut tail: Commit = commit.clone();
-        for _ in 0..depth {
-            let mut first_parent = tail.parents().next().unwrap().clone();
-            merged_commits.insert(first_parent.id());
-            tail = first_parent;
+        // let mut tail: Commit = commit.clone();
+        // for _ in 0..depth {
+        //     let mut first_parent = tail.parents().next().unwrap().clone();
+        //     merged_commits.insert(first_parent.id());
+        //     tail = first_parent;
 
-            // we need to collect all of the non-first parents, and walk all of
-            // their ancestors to see if they're merged in or not
-        }
+        //     // we need to collect all of the non-first parents, and walk all of
+        //     // their ancestors to see if they're merged in or not
+        // }
 
         todo!()
     }

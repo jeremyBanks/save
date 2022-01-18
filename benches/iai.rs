@@ -1,5 +1,5 @@
 #![feature(const_eval_limit)]
-#![const_eval_limit = "0"]
+#![const_eval_limit = "32000000"]
 
 pub use {
     crossterm::style::{style, Color, Stylize},
@@ -62,14 +62,17 @@ main!(
     bench_hash_object_save_large
 );
 
-const SMALL_BODY: [u8; 512] = assorted_bytes();
-const LARGE_BODY: [u8; 1_048_576] = assorted_bytes();
+static SMALL_BODY: [u8; 512] = assorted_bytes();
+static LARGE_BODY: [u8; 1_048_576] = assorted_bytes();
 
 const fn assorted_bytes<const LENGTH: usize>() -> [u8; LENGTH] {
     let mut bytes = [0u8; LENGTH];
     let mut i = 0;
     while i < LENGTH {
-        bytes[i] = (i as u8) % 241;
+        let k = i + LENGTH;
+        // non-random, but with a period of 1_144_718 bytes
+        let n = (k % 109) + (k % 89) + (k % 59) + (k % 2);
+        bytes[i] = n as u8;
         i += 1;
     }
 
