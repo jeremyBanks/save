@@ -4,7 +4,6 @@ default-run = "save"
 description = "Would you like to SAVE the change?"
 edition = "2021"
 homepage = "https://lib.rs/save"
-exclude = ["/target", "/test_repos", ".git"]
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
