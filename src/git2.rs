@@ -7,7 +7,7 @@ pub(self) use git2::{
 };
 use {
     digest::{generic_array::GenericArray, Digest},
-    eyre::Context,
+    eyre::{Context, Result},
     itertools::Itertools,
     petgraph::{
         graphmap::DiGraphMap,
@@ -19,7 +19,7 @@ use {
         borrow::Borrow,
         cell::RefCell,
         cmp::max,
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         fmt::Debug,
         intrinsics::transmute,
         ops::{Deref, DerefMut},
@@ -27,29 +27,10 @@ use {
         rc::Rc,
     },
     tempfile::TempDir,
-    thiserror::Error,
     thousands::Separable,
     tracing::{debug, debug_span, info, instrument, trace, warn},
     typenum::U20,
 };
-
-/// Two-tier `Result` type [in the style of `sled`][1].
-///
-/// The inner `Result`'s `Err` is a specific error type with known potential
-/// errors, and may be handled in a structured way.
-///
-/// The outer `Result`'s `Err` is `eyre::Report`, a catch-all error type
-/// returned when we experience an internal error that we are not prepared to
-/// handle, such as an unexpected filesystem error. Typically, there's nothing
-/// that can be done with these errors except to report on them to the user, and
-/// potentially abort the program.
-///
-/// If you're coercing all of your errors to a single type, you can unwrap both
-/// with a double question-mark: `result??`.
-///
-/// [1]: https://sled.rs/errors.html
-type Result<Success = (), Err = std::convert::Infallible> =
-    std::result::Result<std::result::Result<Success, Err>, eyre::Report>;
 
 /// Extension methods for [`Repository`].
 pub trait RepositoryExt: Borrow<Repository> {
@@ -95,7 +76,7 @@ pub trait RepositoryExt: Borrow<Repository> {
                 }),
             )
             .wrap_err("Failed to add something to the Git index.")?;
-        Ok(Ok(index))
+        Ok(index)
     }
 
     /// Creates a [`Repository`] backed by a new temporary directory.
@@ -105,7 +86,7 @@ pub trait RepositoryExt: Borrow<Repository> {
         let dir = TempDir::new()?;
         let repo = Repository::init(&dir)?;
 
-        Ok(Ok(TemporaryRepository { repo, dir }))
+        Ok(TemporaryRepository { repo, dir })
     }
 
     /// Returns a signature for use in the current repository.
@@ -133,7 +114,7 @@ pub trait RepositoryExt: Borrow<Repository> {
     fn save(&self) -> Result<Commit> {
         let repo: &Repository = self.borrow();
 
-        let mut index = self.working_index()??;
+        let mut index = self.working_index()?;
         let tree = index.write_tree()?;
         let tree = repo.find_tree(tree)?;
         let head = repo.head()?.peel_to_commit()?;
@@ -141,7 +122,7 @@ pub trait RepositoryExt: Borrow<Repository> {
         let message = "hmm";
         let commit = repo.commit(None, &signature, &signature, message, &tree, &[&head])?;
         let commit = repo.find_commit(commit)?;
-        Ok(Ok(commit))
+        Ok(commit)
     }
 }
 
@@ -401,15 +382,27 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         global_maximum_weight
     }
 
-    /// Returns a new Commit with the result of squashing this commit with it
-    /// `depth` first-parent ancestors, and any merged-in descendant
-    /// branches.
+    /// Returns a new [`Commit`] with the result of squashing this [`Commit`]
+    /// with its `depth` first-parent ancestors, and any merged-in
+    /// descendant branches.
     #[instrument(level = "debug")]
     #[must_use]
     fn squashed(&self, depth: u32) -> Commit<'repo> {
         let commit: &Commit<'repo> = self.borrow();
         if depth == 0 {
             return commit.clone();
+        }
+
+        let mut merged_commits: HashSet<Oid> = [commit.id()].into();
+
+        let mut tail: Commit = commit.clone();
+        for _ in 0..depth {
+            let mut first_parent = tail.parents().next().unwrap().clone();
+            merged_commits.insert(first_parent.id());
+            tail = first_parent;
+
+            // we need to collect all of the non-first parents, and walk all of
+            // their ancestors to see if they're merged in or not
         }
 
         todo!()

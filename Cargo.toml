@@ -1,5 +1,6 @@
 [package]
 authors = ["Jeremy Banks <_@jeremy.ca>"]
+default-run = "save"
 description = "Would you like to SAVE the change?"
 edition = "2021"
 homepage = "https://lib.rs/save"
@@ -8,15 +9,6 @@ license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
 version = "0.6.0-dev"
-
-[features]
-default = []
-
-[lib]
-name = "save"
-
-[[bin]]
-name = "save"
 
 [dependencies]
 clap = { features = ["derive", "env", "cargo", "unicode", "wrap_help"], version = "3.0.7" }
