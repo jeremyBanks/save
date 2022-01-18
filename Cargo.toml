@@ -4,7 +4,7 @@ default-run = "save"
 description = "Would you like to SAVE the change?"
 edition = "2021"
 homepage = "https://lib.rs/save"
-include = ["/src/**.rs", "/benches/**.rs", "/examples/**.rs", "/*.toml", "/*.md", "/scripts/*"]
+exclude = ["/target", "/test_repos", ".git"]
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
@@ -41,8 +41,13 @@ codegen-units = 1
 name = "criterion"
 harness = false
 
+[[bench]]
+name = "iai"
+harness = false
+
 [dev-dependencies]
 criterion = { features = ["html_reports"], version = "0.3.5" }
+iai = "0.1.1"
 
 [package.metadata.release]
 allow-branch = ["trunk"]
