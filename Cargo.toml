@@ -7,7 +7,7 @@ homepage = "https://lib.rs/save"
 license = "MIT OR Apache-2.0"
 name = "save"
 repository = "https://github.com/jeremyBanks/save"
-version = "0.6.0-dev"
+version = "0.6.0-dev.1"
 
 [dependencies]
 clap = { features = ["derive", "env", "cargo", "unicode", "wrap_help"], version = "3.0.7" }
