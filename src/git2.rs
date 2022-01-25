@@ -1,4 +1,4 @@
-//! Helpers for [`::git2`].
+//! Extending [`::git2`] (`libgit2`).
 
 #[allow(unused)]
 pub(self) use git2::{

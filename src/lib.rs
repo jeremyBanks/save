@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+#![forbid(unsafe_op_in_unsafe_fn)]
+#![deny(unsafe_code)]
 #![warn(
     explicit_outlives_requirements,
     keyword_idents,
@@ -10,8 +12,6 @@
     noop_method_call,
     single_use_lifetimes,
     unreachable_pub,
-    unsafe_code,
-    unsafe_op_in_unsafe_fn,
     unused_extern_crates,
     unused_import_braces,
     unused_lifetimes,
