@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.6.0-dev.1
+$ cargo install save --version 0.7.0-dev.0
 ```
 
 ```sh
@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.6.0-dev.1
+save 0.7.0-dev.0
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -18,7 +18,7 @@ USAGE:
 OPTIONS:
         --email <EMAIL>
             The email to use for the commit's author and committer.
-            
+
             [default: email from git, or else from parent commit, or
             else "save"]
 
@@ -27,7 +27,7 @@ OPTIONS:
 
     -m, --message <MESSAGE>
             Commit message to use.
-            
+
             [default: generated from generation number, tree hash, and
             parents]
 
@@ -37,7 +37,7 @@ OPTIONS:
 
         --name <NAME>
             The name to use for the commit's author and committer.
-            
+
             [default: name from git, or else from parent commit, or
             else "save"]
 
@@ -47,7 +47,7 @@ OPTIONS:
     -s, --squash <SQUASH_COMMITS>
             Squash/amend previous commit(s), instead of adding a new
             one.
-            
+
             By default, `--squash` will behave like `git commit
             --amend`, only replacing the most recent commit. However,
             specifying a larger number such as `--squash=2` will
@@ -57,15 +57,15 @@ OPTIONS:
             of the squashed commit. Any additional authors will be
             included in Co-Authored-By footers. Commit messages will
             be discarded.
-            
+
             [default: 0]
 
     -t, --step <STEP_SECONDS>
             Seconds of timestamp allocated for each commit to search.
-            
+
             The number of possibilities searched is the half the
             square of this value.
-            
+
             [default: 128]
 
     -v, --verbose
@@ -76,12 +76,12 @@ OPTIONS:
 
     -w, --now <NOW_SECONDS>
             The time is NOW.
-            
+
             [default: the time is ACTUALLY now]
 
     -x, --hash <HASH_HEX>
             The target commit hash or prefix, in hex.
-            
+
             [default: the commit's tree hash]
 
     -y, --yes

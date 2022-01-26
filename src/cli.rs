@@ -2,34 +2,53 @@
 
 use {
     crate::git2::*,
-    clap::Parser,
+    clap::{AppSettings, Parser},
     eyre::{bail, Result, WrapErr},
     git2::{
         Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
     },
+    lazy_static::lazy_static,
     std::{env, fs, process::Command},
     tracing::{debug, info, instrument, trace, warn},
 };
+
+macro_rules! lazy_ref {
+    { $type:ty = $($tt:tt)+ } => {
+        {
+            lazy_static! {
+                static ref VALUE: $type = { $($tt)+ };
+            }
+            VALUE.as_ref()
+        }
+    }
+}
 
 /// Would you like to SAVE the change?
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
-#[clap(version, max_term_width = max_term_width())]
+#[clap(
+    after_help = lazy_ref! { String = format!(
+        "https://docs.rs/{name}/{version}\nhttps://crates.io/crates/{name}/{version}\n{repository}/tree/{version}",
+        name = env!("CARGO_PKG_NAME"),
+        version = env!("CARGO_PKG_VERSION"),
+        repository = env!("CARGO_PKG_REPOSITORY"))
+    },
+    version = format!("v{}", env!("CARGO_PKG_VERSION")),
+    max_term_width = max_term_width(),
+    setting = AppSettings::AllowExternalSubcommands
+            | AppSettings::DeriveDisplayOrder
+            | AppSettings::DontCollapseArgsInUsage
+            | AppSettings::WaitOnError
+            | AppSettings::InferLongArgs,
+    version,
+)]
 pub struct Args {
-    /// Commit message to use.
+    /// Commit message.
     ///
     /// [default: generated from generation number, tree hash, and parents]
     #[clap(long, short = 'm')]
     pub message: Option<String>,
-
-    /// Prepare the commit, but don't actually update any references in Git.
-    #[clap(long, short = 'n')]
-    pub dry_run: bool,
-
-    /// Proceed in spite of any warnings.
-    #[clap(long, short = 'y')]
-    pub yes: bool,
 
     /// Squash/amend previous commit(s), instead of adding a new one.
     ///
@@ -48,36 +67,51 @@ pub struct Args {
     )]
     pub squash_commits: u32,
 
+    /// Don't include any file changes in this commit; its tree will be the same
+    /// as the parent and the working directory will be unmodified.
+    #[clap(long = "empty", short = 'e')]
+    pub empty: bool,
+
     /// The target commit hash or prefix, in hex.
     ///
-    /// [default: the commit's tree hash]
-    #[clap(long = "hash", short = 'x')]
-    pub hash_hex: Option<String>,
+    /// [default: the first four hex digits of the commit's tree hash]
+    #[clap(long = "prefix", short = 'x')]
+    pub prefix_hex: Option<String>,
+
+    /// The time is NOW.
+    ///
+    /// [default: the time is ACTUALLY now]
+    #[clap(long = "timestamp", short = 't')]
+    pub timestamp: Option<i64>,
+
+    /// Use the next available timestamp after the previous commit, regardless
+    /// of the current time or value of `--now`.
+    ///
+    /// If there is no previous commit, this uses the next available timestamp
+    /// after the current time (or value provided to `--now`) rounded down to
+    /// the closest multiple of `0x1000000` (a period of ~6 months).
+    ///
+    /// This can be used to help produce deterministic timestamps and commit
+    /// IDs for reproducible builds.
+    #[clap(long = "timeless", short = '0')]
+    pub timeless: bool,
 
     /// The name to use for the commit's author and committer.
     ///
-    /// [default: name from git, or else from parent commit, or else "save"]
+    /// [default: name from git, or else from parent commit, or else "dev"]
     #[clap(long = "name")]
     pub name: Option<String>,
 
     /// The email to use for the commit's author and committer.
     ///
-    /// [default: email from git, or else from parent commit, or else "save"]
-    #[clap(long)]
+    /// [default: email from git, or else from parent commit, or else
+    /// "dev@localhost"]
+    #[clap(long = "email")]
     pub email: Option<String>,
 
-    /// The time is NOW.
-    ///
-    /// [default: the time is ACTUALLY now]
-    #[clap(long = "now", short = 'w')]
-    pub now_seconds: Option<i64>,
-
-    /// Seconds of timestamp allocated for each commit to search.
-    ///
-    /// The number of possibilities searched is the half the square of this
-    /// value.
-    #[clap(long = "step", short = 't', default_value_t = 128)]
-    pub step_seconds: u32,
+    /// Prepare the commit, but don't actually update any references in Git.
+    #[clap(long, short = 'n')]
+    pub dry_run: bool,
 
     /// Decrease log verbosity. May be used multiple times.
     #[clap(long, short = 'q', parse(from_occurrences))]
@@ -113,7 +147,7 @@ fn max_term_width() -> usize {
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
     let mut target_hash = args
-        .hash_hex
+        .prefix_hex
         .as_ref()
         .map(|s| hex::decode(s).wrap_err("target hash must be hex").unwrap())
         .unwrap_or_default();
@@ -145,10 +179,10 @@ pub fn main(args: Args) -> Result<()> {
         if tree == head.tree_id() {
             if args.message.is_some() {
                 info!("Committing with only a message.");
-            } else if args.yes {
+            } else if args.empty {
                 info!("Committing with no changes.");
             } else {
-                info!("Nothing to commit (-y/--yes to override).");
+                info!("Nothing to commit (use --empty to commit anyway).");
                 return Ok(());
             }
         }
@@ -176,12 +210,12 @@ pub fn main(args: Args) -> Result<()> {
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
     let time = Signature::now(&user_name, &user_email)?.when();
-    let mut seconds = args.now_seconds.unwrap_or_else(|| time.seconds());
+    let mut seconds = time.seconds();
     let offset = 0;
 
     let seconds_since_head = seconds - previous_seconds;
 
-    let step_seconds = i64::from(args.step_seconds);
+    let step_seconds = i64::from(64);
     let snap_seconds = step_seconds * 2;
     let slack_seconds = step_seconds * 4;
 
@@ -336,12 +370,12 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
 
             let dangerous = (path == home::home_dir().unwrap()) || (path.to_str() == Some("/"));
 
-            if dangerous && !args.yes {
+            if dangerous {
                 bail!(
-                    "Current directory seems important, skipping auto-init (-y/--yes to override)."
+                    "Current directory seems important, refusing to run `git init` automatically."
                 );
-            } else if empty && !args.yes {
-                bail!("Current directory is empty, skipping auto-init (-y/--yes to override).");
+            } else if empty && !args.empty {
+                bail!("Current directory is empty, skipping auto-init (--empty to override).");
             } else {
                 info!("Initializing a new Git repository in: {:?}", path);
                 if args.dry_run {
