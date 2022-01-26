@@ -26,6 +26,7 @@ rayon = "1.5.1"
 sha-1 = "0.10.0"
 sha2 = "0.10.1"
 tempfile = "3.3.0"
+termcolor = "1.1.2"
 thiserror = "1.0.30"
 thousands = "0.2.0"
 tracing = { features = ["log"], version = "0.1.29" }

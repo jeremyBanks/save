@@ -1060,6 +1060,7 @@ dependencies = [
  "sha-1",
  "sha2",
  "tempfile",
+ "termcolor",
  "thiserror",
  "thousands",
  "tracing",

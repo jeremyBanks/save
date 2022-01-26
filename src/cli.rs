@@ -2,7 +2,7 @@
 
 use {
     crate::git2::*,
-    clap::{AppSettings, Parser},
+    clap::{AppSettings, Parser, ArgGroup},
     eyre::{bail, Result, WrapErr},
     git2::{
         Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
@@ -29,26 +29,42 @@ macro_rules! lazy_ref {
 #[derive(Parser, Debug, Clone)]
 #[clap(
     after_help = lazy_ref! { String = format!(
-        "https://docs.rs/{name}/{version}\nhttps://crates.io/crates/{name}/{version}\n{repository}/tree/{version}",
+        "{}\n    https://docs.rs/{name}/{semver}\n    https://crates.io/crates/{name}\n    {repository}",
+        "LINKS:",
         name = env!("CARGO_PKG_NAME"),
-        version = env!("CARGO_PKG_VERSION"),
+        semver = {
+            if env!("CARGO_PKG_VERSION_PRE", "").len() > 0 {
+                format!("%3C%3D{}", env!("CARGO_PKG_VERSION"))
+            } else {
+                env!("CARGO_PKG_VERSION").to_string()
+            }
+        },
         repository = env!("CARGO_PKG_REPOSITORY"))
     },
     version = format!("v{}", env!("CARGO_PKG_VERSION")),
     max_term_width = max_term_width(),
-    setting = AppSettings::AllowExternalSubcommands
-            | AppSettings::DeriveDisplayOrder
+    setting = AppSettings::DeriveDisplayOrder
             | AppSettings::DontCollapseArgsInUsage
-            | AppSettings::WaitOnError
-            | AppSettings::InferLongArgs,
-    version,
+            | AppSettings::InferLongArgs
+            | AppSettings::WaitOnError,
+    version
 )]
 pub struct Args {
-    /// Commit message.
+    /// Use this commit message, instead of the default.
     ///
     /// [default: generated from generation number, tree hash, and parents]
     #[clap(long, short = 'm')]
     pub message: Option<String>,
+
+    /// Commit all files in the repository. This is the default.
+    #[clap(long = "all", short = 'a', conflicts_with = "empty")]
+    pub all: bool,
+
+    /// Don't include any file changes in the commit.
+    ///
+    /// This commit will have the same tree hash as its parent.
+    #[clap(long = "empty", short = 'e', conflicts_with = "all")]
+    pub empty: bool,
 
     /// Squash/amend previous commit(s), instead of adding a new one.
     ///
@@ -61,16 +77,12 @@ pub struct Args {
     /// Co-Authored-By footers. Commit messages will be discarded.
     #[clap(
         long = "squash",
+        alias = "amend",
         short = 's',
         default_value = "0",
         default_missing_value = "1"
     )]
     pub squash_commits: u32,
-
-    /// Don't include any file changes in this commit; its tree will be the same
-    /// as the parent and the working directory will be unmodified.
-    #[clap(long = "empty", short = 'e')]
-    pub empty: bool,
 
     /// The target commit hash or prefix, in hex.
     ///
@@ -78,14 +90,12 @@ pub struct Args {
     #[clap(long = "prefix", short = 'x')]
     pub prefix_hex: Option<String>,
 
-    /// The time is NOW.
-    ///
-    /// [default: the time is ACTUALLY now]
+    /// Override the system clock timestamp with a custom one.
     #[clap(long = "timestamp", short = 't')]
     pub timestamp: Option<i64>,
 
     /// Use the next available timestamp after the previous commit, regardless
-    /// of the current time or value of `--now`.
+    /// of the current timestamp.
     ///
     /// If there is no previous commit, this uses the next available timestamp
     /// after the current time (or value provided to `--now`) rounded down to
@@ -114,11 +124,11 @@ pub struct Args {
     pub dry_run: bool,
 
     /// Decrease log verbosity. May be used multiple times.
-    #[clap(long, short = 'q', parse(from_occurrences))]
+    #[clap(long, short = 'q', parse(from_occurrences), conflicts_with = "verbose")]
     pub quiet: i32,
 
     /// Increase log verbosity. May be used multiple times.
-    #[clap(long, short = 'v', parse(from_occurrences))]
+    #[clap(long, short = 'v', parse(from_occurrences), conflicts_with = "quiet")]
     pub verbose: i32,
 }
 
@@ -146,6 +156,7 @@ fn max_term_width() -> usize {
 /// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
+    // TODO: support single 4-bit hex digits, instead of requiring 8-bit pairs
     let mut target_hash = args
         .prefix_hex
         .as_ref()

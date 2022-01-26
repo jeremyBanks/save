@@ -1,5 +1,5 @@
 ```sh
-$ cargo install save --version 0.7.0-dev.0
+$ cargo install save
 ```
 
 ```sh
@@ -16,38 +16,24 @@ USAGE:
     save [OPTIONS]
 
 OPTIONS:
-        --email <EMAIL>
-            The email to use for the commit's author and committer.
-
-            [default: email from git, or else from parent commit, or
-            else "save"]
-
-    -h, --help
-            Print help information
-
     -m, --message <MESSAGE>
-            Commit message to use.
-
+            Use this commit message, instead of the default.
+            
             [default: generated from generation number, tree hash, and
             parents]
 
-    -n, --dry-run
-            Prepare the commit, but don't actually update any
-            references in Git
+    -a, --all
+            Commit all files in the repository. This is the default
 
-        --name <NAME>
-            The name to use for the commit's author and committer.
-
-            [default: name from git, or else from parent commit, or
-            else "save"]
-
-    -q, --quiet
-            Decrease log verbosity. May be used multiple times
+    -e, --empty
+            Don't include any file changes in the commit.
+            
+            This commit will have the same tree hash as its parent.
 
     -s, --squash <SQUASH_COMMITS>
             Squash/amend previous commit(s), instead of adding a new
             one.
-
+            
             By default, `--squash` will behave like `git commit
             --amend`, only replacing the most recent commit. However,
             specifying a larger number such as `--squash=2` will
@@ -57,33 +43,60 @@ OPTIONS:
             of the squashed commit. Any additional authors will be
             included in Co-Authored-By footers. Commit messages will
             be discarded.
-
+            
             [default: 0]
 
-    -t, --step <STEP_SECONDS>
-            Seconds of timestamp allocated for each commit to search.
+    -x, --prefix <PREFIX_HEX>
+            The target commit hash or prefix, in hex.
+            
+            [default: the first four hex digits of the commit's tree
+            hash]
 
-            The number of possibilities searched is the half the
-            square of this value.
+    -t, --timestamp <TIMESTAMP>
+            Override the system clock timestamp with a custom one
 
-            [default: 128]
+    -0, --timeless
+            Use the next available timestamp after the previous
+            commit, regardless of the current timestamp.
+            
+            If there is no previous commit, this uses the next
+            available timestamp after the current time (or value
+            provided to `--now`) rounded down to the closest multiple
+            of `0x1000000` (a period of ~6 months).
+            
+            This can be used to help produce deterministic timestamps
+            and commit IDs for reproducible builds.
+
+        --name <NAME>
+            The name to use for the commit's author and committer.
+            
+            [default: name from git, or else from parent commit, or
+            else "dev"]
+
+        --email <EMAIL>
+            The email to use for the commit's author and committer.
+            
+            [default: email from git, or else from parent commit, or
+            else "dev@localhost"]
+
+    -n, --dry-run
+            Prepare the commit, but don't actually update any
+            references in Git
+
+    -q, --quiet
+            Decrease log verbosity. May be used multiple times
 
     -v, --verbose
             Increase log verbosity. May be used multiple times
 
+    -h, --help
+            Print help information
+
     -V, --version
             Print version information
 
-    -w, --now <NOW_SECONDS>
-            The time is NOW.
-
-            [default: the time is ACTUALLY now]
-
-    -x, --hash <HASH_HEX>
-            The target commit hash or prefix, in hex.
-
-            [default: the commit's tree hash]
-
-    -y, --yes
-            Proceed in spite of any warnings
+[38;5;11mLINKS:[39m
+    https://docs.rs/save/%3C%3D0.7.0-dev.0
+    https://crates.io/crates/save
+    https://github.com/jeremyBanks/save
 ```
