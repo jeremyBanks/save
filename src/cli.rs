@@ -170,7 +170,7 @@ pub fn main(args: Args) -> Result<()> {
     }
 
     if graph_stats.commit_index != graph_stats.generation_index {
-        write!(message, " / c{}", graph_stats.commit_index)?;
+        write!(message, " / n{}", graph_stats.commit_index)?;
     }
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
