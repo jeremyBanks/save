@@ -1,4 +1,3 @@
-#![doc = include_str!("../README.md")]
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(unsafe_code)]
 #![warn(
@@ -7,7 +6,6 @@
     macro_use_extern_crate,
     missing_copy_implementations,
     missing_debug_implementations,
-    missing_docs,
     non_ascii_idents,
     noop_method_call,
     single_use_lifetimes,
@@ -16,6 +14,7 @@
     unused_import_braces,
     unused_lifetimes,
     unused_qualifications,
+    unused_crate_dependencies,
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
@@ -63,3 +62,4 @@
 
 pub mod cli;
 pub mod git2;
+pub mod hex;

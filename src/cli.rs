@@ -2,51 +2,40 @@
 
 use {
     crate::git2::*,
-    clap::{AppSettings, Parser, ArgGroup},
+    clap::{AppSettings, Parser},
     eyre::{bail, Result, WrapErr},
     git2::{
         Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
     },
-    lazy_static::lazy_static,
-    std::{env, fs, process::Command},
+    once_cell::sync::Lazy,
+    std::{env, fmt::Write, fs, process::Command},
     tracing::{debug, info, instrument, trace, warn},
 };
-
-macro_rules! lazy_ref {
-    { $type:ty = $($tt:tt)+ } => {
-        {
-            lazy_static! {
-                static ref VALUE: $type = { $($tt)+ };
-            }
-            VALUE.as_ref()
-        }
-    }
-}
 
 /// Would you like to SAVE the change?
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
 #[clap(
-    after_help = lazy_ref! { String = format!(
-        "{}\n    https://docs.rs/{name}/{semver}\n    https://crates.io/crates/{name}\n    {repository}",
-        "LINKS:",
-        name = env!("CARGO_PKG_NAME"),
-        semver = {
-            if env!("CARGO_PKG_VERSION_PRE", "").len() > 0 {
-                format!("%3C%3D{}", env!("CARGO_PKG_VERSION"))
-            } else {
-                env!("CARGO_PKG_VERSION").to_string()
-            }
-        },
-        repository = env!("CARGO_PKG_REPOSITORY"))
+    after_help = {
+        static AFTER_HELP: Lazy<String> = Lazy::new(|| { format!(
+            "{}\n    https://docs.rs/{name}/{semver}\n    https://crates.io/crates/{name}\n    {repository}",
+            "LINKS:",
+            name = env!("CARGO_PKG_NAME"),
+            semver = {
+                if env!("CARGO_PKG_VERSION_PRE", "").len() > 0 {
+                    format!("%3C%3D{}", env!("CARGO_PKG_VERSION"))
+                } else {
+                    env!("CARGO_PKG_VERSION").to_string()
+                }
+            },
+            repository = env!("CARGO_PKG_REPOSITORY"))
+        });
+        AFTER_HELP.as_ref()
     },
-    version = format!("v{}", env!("CARGO_PKG_VERSION")),
-    max_term_width = max_term_width(),
-    setting = AppSettings::DeriveDisplayOrder
-            | AppSettings::DontCollapseArgsInUsage
-            | AppSettings::InferLongArgs
-            | AppSettings::WaitOnError,
+    dont_collapse_args_in_usage = true,
+    infer_long_args = true,
+    setting = AppSettings::DeriveDisplayOrder,
     version
 )]
 pub struct Args {
@@ -66,25 +55,7 @@ pub struct Args {
     #[clap(long = "empty", short = 'e', conflicts_with = "all")]
     pub empty: bool,
 
-    /// Squash/amend previous commit(s), instead of adding a new one.
-    ///
-    /// By default, `--squash` will behave like `git commit --amend`, only
-    /// replacing the most recent commit. However, specifying a larger number
-    /// such as `--squash=2` will squash that many recent first-parents (and
-    /// any current changes) into a single commit. If any of those commits are
-    /// merges, any non-squashed parents will be added as parents of the
-    /// squashed commit. Any additional authors will be included in
-    /// Co-Authored-By footers. Commit messages will be discarded.
-    #[clap(
-        long = "squash",
-        alias = "amend",
-        short = 's',
-        default_value = "0",
-        default_missing_value = "1"
-    )]
-    pub squash_commits: u32,
-
-    /// The target commit hash or prefix, in hex.
+    /// The required commit hash or prefix, in hex.
     ///
     /// [default: the first four hex digits of the commit's tree hash]
     #[clap(long = "prefix", short = 'x')]
@@ -98,8 +69,8 @@ pub struct Args {
     /// of the current timestamp.
     ///
     /// If there is no previous commit, this uses the next available timestamp
-    /// after the current time (or value provided to `--now`) rounded down to
-    /// the closest multiple of `0x1000000` (a period of ~6 months).
+    /// after the current time (or value provided to `--timestamp`) rounded down
+    /// to the closest multiple of `0x1000000` (a period of ~6 months).
     ///
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
@@ -132,19 +103,6 @@ pub struct Args {
     pub verbose: i32,
 }
 
-/// Used to override the `max_term_width` of our derived [`Args`]
-/// using the **build time** environment variable `MAX_TERM_WIDTH`.
-///
-/// This is hacky and bad for the build cache, only meant for internal use in
-/// generating the `--help` text for `README.md`, which needs to be
-/// tightly wrapped to fit in available space on crates.io.
-fn max_term_width() -> usize {
-    option_env!("MAX_TERM_WIDTH")
-        .unwrap_or("100")
-        .parse()
-        .unwrap()
-}
-
 /// CLI entry point.
 ///
 /// # Panics
@@ -156,11 +114,10 @@ fn max_term_width() -> usize {
 /// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
-    // TODO: support single 4-bit hex digits, instead of requiring 8-bit pairs
-    let mut target_hash = args
+    let target = args
         .prefix_hex
         .as_ref()
-        .map(|s| hex::decode(s).wrap_err("target hash must be hex").unwrap())
+        .map(|s| crate::hex::decode_hex_nibbles(s))
         .unwrap_or_default();
 
     let repo = open_or_init_repo(&args)?;
@@ -175,12 +132,10 @@ pub fn main(args: Args) -> Result<()> {
 
     let (user_name, user_email) = get_git_user(&args, &repo, &head)?;
 
-    let generation_number = head
+    let graph_stats = head
         .as_ref()
-        .map(|commit| {
-            (commit.generation_number() + commit.generation_number_via_petgraph()) / 2 + 1
-        })
-        .unwrap_or(0);
+        .map(|commit| commit.graph_stats())
+        .unwrap_or_default();
 
     let mut index = repo.working_index()?;
 
@@ -193,7 +148,7 @@ pub fn main(args: Args) -> Result<()> {
             } else if args.empty {
                 info!("Committing with no changes.");
             } else {
-                info!("Nothing to commit (use --empty to commit anyway).");
+                info!("Nothing to commit (use --empty if this is intentional).");
                 return Ok(());
             }
         }
@@ -202,22 +157,21 @@ pub fn main(args: Args) -> Result<()> {
     if !args.dry_run {
         index.write()?;
     } else {
-        info!("Skipping index write because this is a dry run.");
+        debug!("Skipping index write because this is a dry run.");
     }
 
-    let tree4 = &tree.to_string()[..4];
     let tree = repo.find_tree(tree)?;
 
-    let revision_index = generation_number + 1;
-    let message = args.message.unwrap_or_else(|| {
-        let mut message = format!("r{}", revision_index);
-        if let Some(ref head) = head {
-            message += &format!("/{}/{}", tree4, &head.id().to_string()[..4]);
-        } else if tree.iter().next().is_some() {
-            message += &format!("/{}", &tree4);
-        }
-        message
-    });
+    let mut message = String::new();
+    write!(message, "r{}", graph_stats.revision_index)?;
+
+    if graph_stats.generation_index != graph_stats.revision_index {
+        write!(message, " / g{}", graph_stats.generation_index)?;
+    }
+
+    if graph_stats.commit_index != graph_stats.generation_index {
+        write!(message, " / c{}", graph_stats.commit_index)?;
+    }
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
     let time = Signature::now(&user_name, &user_email)?.when();
@@ -241,8 +195,6 @@ pub fn main(args: Args) -> Result<()> {
     let min_timestamp = seconds;
     let max_timestamp = seconds + step_seconds - 1;
 
-    target_hash.append(&mut tree.id().as_bytes().to_vec());
-
     let base_commit = repo.commit(
         None,
         &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
@@ -253,8 +205,13 @@ pub fn main(args: Args) -> Result<()> {
     )?;
     let base_commit = repo.find_commit(base_commit)?;
 
-    let commit =
-        base_commit.brute_force_timestamps(&repo, &target_hash, min_timestamp, max_timestamp);
+    let commit = base_commit.brute_force_timestamps(
+        &repo,
+        &target.bytes,
+        Some(&target.mask),
+        min_timestamp,
+        max_timestamp,
+    );
 
     let commit = commit.commit();
 
@@ -425,27 +382,37 @@ pub fn init() -> Args {
 
     let args = Args::parse();
 
-    let default_verbosity = 3;
+    let default_verbosity_self = 3;
+    let default_verbosity_other = 1;
 
     let log_env = env::var("RUST_LOG").unwrap_or_default();
 
-    let log_level = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
+    let rust_log = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
         log_env
     } else {
-        match default_verbosity + args.verbose - args.quiet {
-            i32::MIN..=0 => "off".into(),
-            1 => "error".into(),
-            2 => "warn".into(),
-            3 => "info".into(),
-            4 => "debug".into(),
-            5..=i32::MAX => "trace".into(),
-        }
+        let verbosity_self = match default_verbosity_self + args.verbose - args.quiet {
+            i32::MIN..=0 => "off",
+            1 => "error",
+            2 => "warn",
+            3 => "info",
+            4 => "debug",
+            5..=i32::MAX => "trace",
+        };
+        let verbosity_other = match default_verbosity_other + args.verbose - args.quiet {
+            i32::MIN..=0 => "off",
+            1 => "error",
+            2 => "warn",
+            3 => "info",
+            4 => "debug",
+            5..=i32::MAX => "trace",
+        };
+        format!("{verbosity_other},save={verbosity_self}")
     };
 
     tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
         tracing_error::ErrorLayer::default(),
         tracing_subscriber::fmt()
-            .with_env_filter(::tracing_subscriber::EnvFilter::new(log_level))
+            .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
             .with_target(false)
             .with_span_events(
                 tracing_subscriber::fmt::format::FmtSpan::ENTER
