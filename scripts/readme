@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -veuo pipefail
 
 cd "$(dirname "$0")/.."
@@ -17,5 +17,5 @@ $ save --help
 ```
 
 ```text
-'"$(NO_COLOR=NO MAX_TERM_WIDTH=70 cargo run -- --help)"'
+'"$(NO_COLOR=NO cargo run -- --help)"'
 ```' > "./README.md"

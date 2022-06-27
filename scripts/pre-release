@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -veuo pipefail
 
 cd "$(dirname "$0")/.."
