@@ -1,11 +1,11 @@
 //! Extending [`::git2`] (`libgit2`).
 
 #[allow(unused)]
-pub(self) use git2::{
+pub(self) use ::git2::{
     Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
     Signature, Tag, Time, Tree,
 };
-use {
+use ::{
     digest::{generic_array::GenericArray, typenum::U20, Digest},
     eyre::{Context, Result},
     itertools::Itertools,
@@ -17,19 +17,14 @@ use {
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::{
         borrow::Borrow,
-        cell::RefCell,
-        cmp::max,
-        collections::{HashMap, HashSet},
         fmt::Debug,
         intrinsics::transmute,
         ops::{Deref, DerefMut},
         path::PathBuf,
-        rc::Rc,
     },
     tempfile::TempDir,
-    thousands::Separable,
-    tracing::{debug, debug_span, info, instrument, trace, warn},
 };
+use crate::*;
 
 /// Extension methods for [`Repository`].
 pub trait RepositoryExt: Borrow<Repository> {
@@ -336,7 +331,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         target_mask: Option<&[u8]>,
         min_timestamp: impl Into<Option<i64>>,
         max_timestamp: impl Into<Option<i64>>,
-    ) -> BruteForcedCommit<'repo> {
+    ) -> Commit<'repo> {
         let target_mask = target_mask.unwrap_or({
             static DEFAULT: &[u8] = &[0xFF; 20];
             &DEFAULT[..target_prefix.len().min(DEFAULT.len())]
@@ -456,85 +451,11 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
         assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
 
-        if best_oid.as_bytes().starts_with(target_prefix) {
-            debug!("Brute-forced a complete prefix match: {best_oid} for {target_prefix:02x?}");
-            BruteForcedCommit::Complete {
-                commit: brute_forced_commit,
-            }
-        } else {
-            debug!("Brute-forced a partial prefix match: {best_oid} for {target_prefix:02x?}");
-            BruteForcedCommit::Incomplete {
-                commit: brute_forced_commit,
-            }
-        }
+        brute_forced_commit
     }
 }
 
 impl<'repo> CommitExt<'repo> for Commit<'repo> {}
-
-/// The commit resulting from a [`CommitExt::brute_force_timestamps`] call,
-/// wrapped to indicate whether the target prefix was complete or incompletely
-/// matched.
-#[derive(Debug, Clone)]
-#[must_use]
-pub enum BruteForcedCommit<'repo> {
-    /// The specified `target_prefix` was entirely matched.
-    Complete {
-        /// The resulting commit.
-        commit: Commit<'repo>,
-    },
-    /// The specified `target_prefix` was not entirely matched.
-    Incomplete {
-        /// The resulting commit.
-        commit: Commit<'repo>,
-    },
-}
-
-impl<'repo> Borrow<Commit<'repo>> for BruteForcedCommit<'repo> {
-    fn borrow(&self) -> &Commit<'repo> {
-        self.commit()
-    }
-}
-
-impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
-    fn from(commit: BruteForcedCommit<'repo>) -> Self {
-        match commit {
-            BruteForcedCommit::Complete { commit, .. }
-            | BruteForcedCommit::Incomplete { commit, .. } => commit,
-        }
-    }
-}
-
-impl<'repo> BruteForcedCommit<'repo> {
-    /// Returns a reference to the underlying [`Commit`].
-    #[must_use]
-    pub const fn commit(&self) -> &Commit<'repo> {
-        match self {
-            BruteForcedCommit::Complete { commit, .. }
-            | BruteForcedCommit::Incomplete { commit, .. } => commit,
-        }
-    }
-
-    /// Returns a reference to the underlying [`Commit`] if it is a complete
-    /// match.
-    #[must_use]
-    pub const fn complete(&self) -> Option<&Commit<'repo>> {
-        match self {
-            BruteForcedCommit::Complete { commit, .. } => Some(commit),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the underlying [`Commit`] if it is not a complete
-    /// match.
-    #[must_use]
-    pub const fn incomplete(&self) -> Option<&Commit<'repo>> {
-        match self {
-            BruteForcedCommit::Incomplete { commit, .. } => Some(commit),
-            _ => None,
-        }
-    }
-}
 
 /// Extension methods for [`Oid`].
 pub trait OidExt: Borrow<Oid> + Debug {

@@ -3,7 +3,7 @@
 use {
     crate::git2::*,
     clap::{AppSettings, Parser},
-    eyre::{bail, Result, WrapErr},
+    eyre::{bail, Result},
     git2::{
         Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
     },
@@ -42,7 +42,7 @@ pub struct Args {
     /// Use this commit message, instead of the default.
     ///
     /// [default: generated from generation number, tree hash, and parents]
-    #[clap(long, short = 'm', env="SAVE_COMMIT_MESSAGE")]
+    #[clap(long, short = 'm', env = "SAVE_COMMIT_MESSAGE")]
     pub message: Option<String>,
 
     /// Commit all files in the repository. This is the default.
@@ -58,11 +58,11 @@ pub struct Args {
     /// The required commit hash or prefix, in hex.
     ///
     /// [default: the first four hex digits of the commit's tree hash]
-    #[clap(long = "prefix", short = 'x', env="SAVE_COMMIT_PREFIX")]
+    #[clap(long = "prefix", short = 'x', env = "SAVE_COMMIT_PREFIX")]
     pub prefix_hex: Option<String>,
 
     /// Override the system clock timestamp with a custom one.
-    #[clap(long = "timestamp", short = 't', env="SAVE_TIMESTAMP")]
+    #[clap(long = "timestamp", short = 't', env = "SAVE_TIMESTAMP")]
     pub timestamp: Option<i64>,
 
     /// Use the next available timestamp after the previous commit, regardless
@@ -74,7 +74,7 @@ pub struct Args {
     ///
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
-    #[clap(long = "timeless", short = '0', env="SAVE_TIMELESS")]
+    #[clap(long = "timeless", short = '0', env = "SAVE_TIMELESS")]
     pub timeless: bool,
 
     /// The name to use for the commit's author and committer.
@@ -214,8 +214,6 @@ pub fn main(args: Args) -> Result<()> {
         min_timestamp,
         max_timestamp,
     );
-
-    let commit = commit.commit();
 
     if !args.dry_run {
         let mut head_ref = repo.head()?;
