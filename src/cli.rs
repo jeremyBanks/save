@@ -185,22 +185,11 @@ pub fn main(args: Args) -> Result<()> {
 
     let seconds_since_head = seconds - previous_seconds;
 
-    let step_seconds = i64::from(64);
-    let snap_seconds = step_seconds * 2;
-    let slack_seconds = step_seconds * 4;
-
-    // XXX: do we still want this mechanism?
-    // probably not; it'll be encompassed in our brute-forcing.
-    if seconds_since_head < slack_seconds {
-        seconds = previous_seconds + step_seconds;
-    } else {
-        seconds = seconds - seconds % snap_seconds;
-    }
-
     let parents = &head.iter().collect::<Vec<_>>();
 
+    // X: lol nope
     let min_timestamp = seconds;
-    let max_timestamp = seconds + step_seconds - 1;
+    let max_timestamp = seconds + 64 - 1;
 
     let base_commit = repo.commit(
         None,
