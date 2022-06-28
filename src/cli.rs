@@ -175,7 +175,7 @@ pub fn main(args: Args) -> Result<()> {
     }
 
     if !tree.is_empty() {
-        write!(message, " / 0x{tree4}")?;
+        write!(message, " / x{tree4}")?;
     }
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
