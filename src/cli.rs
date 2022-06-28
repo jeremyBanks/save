@@ -160,7 +160,7 @@ pub fn main(args: Args) -> Result<()> {
         info!("Skipping index write because this is a dry run.");
     }
 
-    let tree4 = tree.to_string()[..4].to_string();
+    let tree4 = tree.to_string()[..4].to_string().to_ascii_uppercase();
     let tree = repo.find_tree(tree)?;
 
     let mut message = String::new();
@@ -175,7 +175,7 @@ pub fn main(args: Args) -> Result<()> {
     }
 
     if !tree.is_empty() {
-        write!(message, " / t{tree4}")?;
+        write!(message, " / 0x{tree4}")?;
     }
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
