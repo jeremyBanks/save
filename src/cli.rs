@@ -160,6 +160,7 @@ pub fn main(args: Args) -> Result<()> {
         debug!("Skipping index write because this is a dry run.");
     }
 
+    let tree4 = tree.to_string()[..4].to_string();
     let tree = repo.find_tree(tree)?;
 
     let mut message = String::new();
