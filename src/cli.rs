@@ -157,7 +157,7 @@ pub fn main(args: Args) -> Result<()> {
     if !args.dry_run {
         index.write()?;
     } else {
-        debug!("Skipping index write because this is a dry run.");
+        info!("Skipping index write because this is a dry run.");
     }
 
     let tree4 = tree.to_string()[..4].to_string();
@@ -172,6 +172,10 @@ pub fn main(args: Args) -> Result<()> {
 
     if graph_stats.commit_index != graph_stats.generation_index {
         write!(message, " / n{}", graph_stats.commit_index)?;
+    }
+
+    if !tree.is_empty() {
+        write!(message, " / t{tree4}")?;
     }
 
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
