@@ -6,7 +6,7 @@ pub(self) use ::git2::{
     Signature, Tag, Time, Tree,
 };
 use {
-    crate::{util::ZigZag, *},
+    crate::{zigzag::ZigZag, *},
     std::cmp::Ordering,
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},

@@ -64,7 +64,8 @@
 pub mod cli;
 pub mod git2;
 pub mod hex;
-pub mod util;
+mod zigzag;
+pub use zigzag::{ZigZag, ZugZug};
 
 #[allow(unused)]
 pub(crate) use tracing::{
