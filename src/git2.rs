@@ -5,26 +5,30 @@ pub(self) use ::git2::{
     Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
     Signature, Tag, Time, Tree,
 };
-use ::{
-    digest::{generic_array::GenericArray, typenum::U20, Digest},
-    eyre::{Context, Result},
-    itertools::Itertools,
-    petgraph::{
-        graphmap::DiGraphMap,
-        visit::Topo,
-        EdgeDirection::{Incoming, Outgoing},
+use {
+    crate::{util::ZigZag, *},
+    std::cmp::Ordering,
+    ::{
+        digest::{generic_array::GenericArray, typenum::U20, Digest},
+        eyre::{Context, Result},
+        itertools::Itertools,
+        parking_lot::RwLock,
+        petgraph::{
+            graphmap::DiGraphMap,
+            visit::Topo,
+            EdgeDirection::{Incoming, Outgoing},
+        },
+        rayon::iter::{IntoParallelIterator, ParallelIterator},
+        std::{
+            borrow::Borrow,
+            fmt::Debug,
+            intrinsics::transmute,
+            ops::{Deref, DerefMut},
+            path::PathBuf,
+        },
+        tempfile::TempDir,
     },
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
-    std::{
-        borrow::Borrow,
-        fmt::Debug,
-        intrinsics::transmute,
-        ops::{Deref, DerefMut},
-        path::PathBuf,
-    },
-    tempfile::TempDir,
 };
-use crate::*;
 
 /// Extension methods for [`Repository`].
 pub trait RepositoryExt: Borrow<Repository> {
@@ -330,13 +334,73 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         target_prefix: &[u8],
         target_mask: Option<&[u8]>,
         min_timestamp: impl Into<Option<i64>>,
-        max_timestamp: impl Into<Option<i64>>,
+        target_timestamp: impl Into<Option<i64>>,
     ) -> Commit<'repo> {
         let target_mask = target_mask.unwrap_or({
             static DEFAULT: &[u8] = &[0xFF; 20];
             &DEFAULT[..target_prefix.len().min(DEFAULT.len())]
         });
         trace!("Brute forcing a timestamp for {target_prefix:2x?} with mask {target_mask:2x?}");
+
+        let thread_count = num_cpus::get();
+        trace!("Using {thread_count} threads");
+
+        let best: RwLock<Option<Hit>> = RwLock::new(None);
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        struct Hit {
+            /// commit timestamp - target timestamp
+            commit_offset: i64,
+            /// author timestamp - target timestamp
+            author_offset: i64,
+        }
+
+        // Okay, what about a total mapping?
+        let mut min = 0i64;
+        let mut max = 0i64;
+        let mut options = vec![(min, max)];
+
+        loop {
+            if min <= -max {
+                max += 1;
+                for i in 0..((max - min) as u64) {
+                    let lower = i.zigzag();
+                    options.push((lower, max));
+                }
+            } else {
+                min -= 1;
+                for upper in min..=max {
+                    options.push((min, upper));
+                }
+            }
+        }
+
+        impl Hit {
+            fn sort_key(&self) -> (u64, u64) {
+                let commit_offset_zigzag = self.commit_offset.zigzag();
+                let author_offset_zigzag = self.author_offset.zigzag();
+                (commit_offset_zigzag, author_offset_zigzag)
+            }
+        }
+
+        impl Ord for Hit {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.sort_key().cmp(&other.sort_key())
+            }
+        }
+
+        impl PartialOrd for Hit {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        std::thread::scope(|scope| {
+            for thread_index in 0..thread_count {
+                scope.spawn(|| {});
+            }
+        });
+
         let commit = self.borrow();
         let min_timestamp = min_timestamp
             .into()
@@ -344,7 +408,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
         // TODO: actually short-circuit on full matches so this isn't always an infinite
         // loop
-        let max_timestamp = max_timestamp.into().unwrap_or(i64::MAX);
+        let max_timestamp = target_timestamp.into().unwrap_or(i64::MAX);
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
 

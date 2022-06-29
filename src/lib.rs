@@ -1,3 +1,4 @@
+#![feature(scoped_threads)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(unsafe_code)]
 #![warn(
@@ -63,6 +64,7 @@
 pub mod cli;
 pub mod git2;
 pub mod hex;
+pub mod util;
 
 #[allow(unused)]
 pub(crate) use tracing::{

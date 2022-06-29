@@ -178,35 +178,33 @@ pub fn main(args: Args) -> Result<()> {
         write!(message, " / x{tree4}")?;
     }
 
+    // TODO: look at merge heads too, and set our minimum timestamp to one greater
+    // than the maximum of all heads
     let previous_seconds = head.as_ref().map(|c| c.time().seconds()).unwrap_or(0);
     let time = Signature::now(&user_name, &user_email)?.when();
-    let mut seconds = time.seconds();
-    let offset = 0;
-
-    let seconds_since_head = seconds - previous_seconds;
+    let seconds = time.seconds();
 
     let parents = &head.iter().collect::<Vec<_>>();
 
-    // X: lol nope
-    let min_timestamp = seconds;
-    let max_timestamp = seconds + 64 - 1;
-
     let base_commit = repo.commit(
         None,
-        &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
-        &Signature::new(&user_name, &user_email, &Time::new(min_timestamp, offset)).unwrap(),
+        &Signature::new(&user_name, &user_email, &Time::new(seconds, 0)).unwrap(),
+        &Signature::new(&user_name, &user_email, &Time::new(seconds, 0)).unwrap(),
         &message,
         &tree,
         parents,
     )?;
     let base_commit = repo.find_commit(base_commit)?;
 
+    let min_timestamp = previous_seconds;
+    let target_timestamp = seconds;
+
     let commit = base_commit.brute_force_timestamps(
         &repo,
         &target.bytes,
         Some(&target.mask),
         min_timestamp,
-        max_timestamp,
+        target_timestamp,
     );
 
     if !args.dry_run {
