@@ -65,10 +65,9 @@ pub mod cli;
 pub mod git2;
 pub mod hex;
 mod zigzag;
-pub use zigzag::{ZigZag, ZugZug};
-
 #[allow(unused)]
 pub(crate) use tracing::{
     debug, debug_span, error, error_span, info, info_span, instrument, trace, trace_span, warn,
     warn_span,
 };
+pub use zigzag::{ZigZag, ZugZug};
