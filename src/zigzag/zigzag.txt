@@ -253,4 +253,4 @@
 252_u8.zigzag() == -126_i8
 253_u8.zigzag() ==  127_i8
 254_u8.zigzag() == -127_i8
-255_u8.zigzag() == -128_i8
+255_u8.zigzag() == -128_i8, but 255_u16.zigzag() ==  128_i16

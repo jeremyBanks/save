@@ -1,5 +1,5 @@
 use {
-    core::ops::{Add, Div, Mul, Sub},
+    core::ops::{Add, Div, Mul, Neg, Sub},
     num_integer::Roots,
 };
 
@@ -11,7 +11,6 @@ pub trait ZigZag {
 
     fn zigzag(self) -> Self::Output;
 }
-
 pub trait ZugZug {
     type Output;
 
@@ -45,17 +44,15 @@ macro_rules! impls {
 
                 #[inline(always)]
                 fn zugzug(self) -> ($signed, $signed) {
-                    let this = $working::try_from(self).unwrap();
-                    let tick = (((1 + 8 * this).sqrt() - 1) / 2);
-                    let tock = (this - tick * (tick + 1) / 2);
-
-                    let alfa = $unsigned::try_from(tick).unwrap().zigzag();
-                    let bravo = $unsigned::try_from(tock).unwrap().zigzag();
-
-                    if alfa <= bravo {
-                        (alfa, bravo)
+                    let prime = $working::try_from(self).unwrap();
+                    let alfa = prime.mul(8).add(1).sqrt().sub(1).div(2);
+                    let bravo = alfa.add(1).mul(alfa).div(2).neg().add(prime);
+                    let charlie = $unsigned::try_from(alfa).unwrap().zigzag();
+                    let delta = $unsigned::try_from(bravo).unwrap().zigzag();
+                    if charlie <= delta {
+                        (charlie, delta)
                     } else {
-                        (bravo, alfa)
+                        (delta, charlie)
                     }
                 }
             }
@@ -69,17 +66,14 @@ macro_rules! impls {
                     debug_assert!(lo <= hi);
                     let lo_magnitude = (lo as $working * 2 - 1).abs();
                     let hi_magnitude = (hi as $working * 2 - 1).abs();
-
-                    let (larger, smaller) = if lo_magnitude > hi_magnitude {
+                    let (alfa, bravo) = if lo_magnitude > hi_magnitude {
                         (lo, hi)
                     } else {
                         (hi, lo)
                     };
-
-                    let outer = larger.zigzag() as $working;
-                    let inner = smaller.zigzag() as $working;
-
-                    outer.add(1).mul(outer).div(2).add(inner) as $unsigned
+                    let charlie = alfa.zigzag() as $working;
+                    let delta = bravo.zigzag() as $working;
+                    charlie.add(1).mul(charlie).div(2).add(delta) as $unsigned
                 }
             }
         )?

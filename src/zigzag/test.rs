@@ -70,13 +70,18 @@ fn zigzag_known_values() {
 }
 
 #[test]
-fn zigzag_u8_snapshot() {
+fn zigzag_snapshot() {
     let mut actual = String::new();
     for i in u8::MIN..=u8::MAX {
         let x = i.zigzag();
-        actual += &format!("{i:>3}_u8.zigzag() == {x:>4}_i8\n");
+        let xp = (i as u16).zigzag();
+        actual += &format!("{i:>3}_u8.zigzag() == {x:>4}_i8");
+        if xp != (x as _) {
+            actual += &format!(", but {i:>3}_u16.zigzag() == {xp:>4}_i16");
+        }
+        actual += "\n";
     }
-    expect_file!("zigzag_u8.txt").assert_eq(&actual);
+    expect_file!("zigzag.txt").assert_eq(&actual);
 }
 
 #[test]
@@ -124,11 +129,11 @@ fn zugzug_known_values() {
 }
 
 #[test]
-fn zugzug_u8_snapshot() {
+fn zugzug_snapshot() {
     let mut actual = String::new();
-    for i in u8::MIN..=u8::MAX {
+    for i in 0..1024u16 {
         let (x, y) = i.zugzug();
-        actual += &format!("{i:>3}_u8.zugzug() == ({x:>3}_i8, {y:>3}_i8)\n");
+        actual += &format!("{i:>3}.zugzug() == ({x:>3}, {y:>3})\n");
     }
-    expect_file!("zugzug_u8.txt").assert_eq(&actual);
+    expect_file!("zugzug.txt").assert_eq(&actual);
 }
