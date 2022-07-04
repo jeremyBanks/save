@@ -1,0 +1,256 @@
+  0_u8.zigzag() ==    0_i8
+  1_u8.zigzag() ==    1_i8
+  2_u8.zigzag() ==   -1_i8
+  3_u8.zigzag() ==    2_i8
+  4_u8.zigzag() ==   -2_i8
+  5_u8.zigzag() ==    3_i8
+  6_u8.zigzag() ==   -3_i8
+  7_u8.zigzag() ==    4_i8
+  8_u8.zigzag() ==   -4_i8
+  9_u8.zigzag() ==    5_i8
+ 10_u8.zigzag() ==   -5_i8
+ 11_u8.zigzag() ==    6_i8
+ 12_u8.zigzag() ==   -6_i8
+ 13_u8.zigzag() ==    7_i8
+ 14_u8.zigzag() ==   -7_i8
+ 15_u8.zigzag() ==    8_i8
+ 16_u8.zigzag() ==   -8_i8
+ 17_u8.zigzag() ==    9_i8
+ 18_u8.zigzag() ==   -9_i8
+ 19_u8.zigzag() ==   10_i8
+ 20_u8.zigzag() ==  -10_i8
+ 21_u8.zigzag() ==   11_i8
+ 22_u8.zigzag() ==  -11_i8
+ 23_u8.zigzag() ==   12_i8
+ 24_u8.zigzag() ==  -12_i8
+ 25_u8.zigzag() ==   13_i8
+ 26_u8.zigzag() ==  -13_i8
+ 27_u8.zigzag() ==   14_i8
+ 28_u8.zigzag() ==  -14_i8
+ 29_u8.zigzag() ==   15_i8
+ 30_u8.zigzag() ==  -15_i8
+ 31_u8.zigzag() ==   16_i8
+ 32_u8.zigzag() ==  -16_i8
+ 33_u8.zigzag() ==   17_i8
+ 34_u8.zigzag() ==  -17_i8
+ 35_u8.zigzag() ==   18_i8
+ 36_u8.zigzag() ==  -18_i8
+ 37_u8.zigzag() ==   19_i8
+ 38_u8.zigzag() ==  -19_i8
+ 39_u8.zigzag() ==   20_i8
+ 40_u8.zigzag() ==  -20_i8
+ 41_u8.zigzag() ==   21_i8
+ 42_u8.zigzag() ==  -21_i8
+ 43_u8.zigzag() ==   22_i8
+ 44_u8.zigzag() ==  -22_i8
+ 45_u8.zigzag() ==   23_i8
+ 46_u8.zigzag() ==  -23_i8
+ 47_u8.zigzag() ==   24_i8
+ 48_u8.zigzag() ==  -24_i8
+ 49_u8.zigzag() ==   25_i8
+ 50_u8.zigzag() ==  -25_i8
+ 51_u8.zigzag() ==   26_i8
+ 52_u8.zigzag() ==  -26_i8
+ 53_u8.zigzag() ==   27_i8
+ 54_u8.zigzag() ==  -27_i8
+ 55_u8.zigzag() ==   28_i8
+ 56_u8.zigzag() ==  -28_i8
+ 57_u8.zigzag() ==   29_i8
+ 58_u8.zigzag() ==  -29_i8
+ 59_u8.zigzag() ==   30_i8
+ 60_u8.zigzag() ==  -30_i8
+ 61_u8.zigzag() ==   31_i8
+ 62_u8.zigzag() ==  -31_i8
+ 63_u8.zigzag() ==   32_i8
+ 64_u8.zigzag() ==  -32_i8
+ 65_u8.zigzag() ==   33_i8
+ 66_u8.zigzag() ==  -33_i8
+ 67_u8.zigzag() ==   34_i8
+ 68_u8.zigzag() ==  -34_i8
+ 69_u8.zigzag() ==   35_i8
+ 70_u8.zigzag() ==  -35_i8
+ 71_u8.zigzag() ==   36_i8
+ 72_u8.zigzag() ==  -36_i8
+ 73_u8.zigzag() ==   37_i8
+ 74_u8.zigzag() ==  -37_i8
+ 75_u8.zigzag() ==   38_i8
+ 76_u8.zigzag() ==  -38_i8
+ 77_u8.zigzag() ==   39_i8
+ 78_u8.zigzag() ==  -39_i8
+ 79_u8.zigzag() ==   40_i8
+ 80_u8.zigzag() ==  -40_i8
+ 81_u8.zigzag() ==   41_i8
+ 82_u8.zigzag() ==  -41_i8
+ 83_u8.zigzag() ==   42_i8
+ 84_u8.zigzag() ==  -42_i8
+ 85_u8.zigzag() ==   43_i8
+ 86_u8.zigzag() ==  -43_i8
+ 87_u8.zigzag() ==   44_i8
+ 88_u8.zigzag() ==  -44_i8
+ 89_u8.zigzag() ==   45_i8
+ 90_u8.zigzag() ==  -45_i8
+ 91_u8.zigzag() ==   46_i8
+ 92_u8.zigzag() ==  -46_i8
+ 93_u8.zigzag() ==   47_i8
+ 94_u8.zigzag() ==  -47_i8
+ 95_u8.zigzag() ==   48_i8
+ 96_u8.zigzag() ==  -48_i8
+ 97_u8.zigzag() ==   49_i8
+ 98_u8.zigzag() ==  -49_i8
+ 99_u8.zigzag() ==   50_i8
+100_u8.zigzag() ==  -50_i8
+101_u8.zigzag() ==   51_i8
+102_u8.zigzag() ==  -51_i8
+103_u8.zigzag() ==   52_i8
+104_u8.zigzag() ==  -52_i8
+105_u8.zigzag() ==   53_i8
+106_u8.zigzag() ==  -53_i8
+107_u8.zigzag() ==   54_i8
+108_u8.zigzag() ==  -54_i8
+109_u8.zigzag() ==   55_i8
+110_u8.zigzag() ==  -55_i8
+111_u8.zigzag() ==   56_i8
+112_u8.zigzag() ==  -56_i8
+113_u8.zigzag() ==   57_i8
+114_u8.zigzag() ==  -57_i8
+115_u8.zigzag() ==   58_i8
+116_u8.zigzag() ==  -58_i8
+117_u8.zigzag() ==   59_i8
+118_u8.zigzag() ==  -59_i8
+119_u8.zigzag() ==   60_i8
+120_u8.zigzag() ==  -60_i8
+121_u8.zigzag() ==   61_i8
+122_u8.zigzag() ==  -61_i8
+123_u8.zigzag() ==   62_i8
+124_u8.zigzag() ==  -62_i8
+125_u8.zigzag() ==   63_i8
+126_u8.zigzag() ==  -63_i8
+127_u8.zigzag() ==   64_i8
+128_u8.zigzag() ==  -64_i8
+129_u8.zigzag() ==   65_i8
+130_u8.zigzag() ==  -65_i8
+131_u8.zigzag() ==   66_i8
+132_u8.zigzag() ==  -66_i8
+133_u8.zigzag() ==   67_i8
+134_u8.zigzag() ==  -67_i8
+135_u8.zigzag() ==   68_i8
+136_u8.zigzag() ==  -68_i8
+137_u8.zigzag() ==   69_i8
+138_u8.zigzag() ==  -69_i8
+139_u8.zigzag() ==   70_i8
+140_u8.zigzag() ==  -70_i8
+141_u8.zigzag() ==   71_i8
+142_u8.zigzag() ==  -71_i8
+143_u8.zigzag() ==   72_i8
+144_u8.zigzag() ==  -72_i8
+145_u8.zigzag() ==   73_i8
+146_u8.zigzag() ==  -73_i8
+147_u8.zigzag() ==   74_i8
+148_u8.zigzag() ==  -74_i8
+149_u8.zigzag() ==   75_i8
+150_u8.zigzag() ==  -75_i8
+151_u8.zigzag() ==   76_i8
+152_u8.zigzag() ==  -76_i8
+153_u8.zigzag() ==   77_i8
+154_u8.zigzag() ==  -77_i8
+155_u8.zigzag() ==   78_i8
+156_u8.zigzag() ==  -78_i8
+157_u8.zigzag() ==   79_i8
+158_u8.zigzag() ==  -79_i8
+159_u8.zigzag() ==   80_i8
+160_u8.zigzag() ==  -80_i8
+161_u8.zigzag() ==   81_i8
+162_u8.zigzag() ==  -81_i8
+163_u8.zigzag() ==   82_i8
+164_u8.zigzag() ==  -82_i8
+165_u8.zigzag() ==   83_i8
+166_u8.zigzag() ==  -83_i8
+167_u8.zigzag() ==   84_i8
+168_u8.zigzag() ==  -84_i8
+169_u8.zigzag() ==   85_i8
+170_u8.zigzag() ==  -85_i8
+171_u8.zigzag() ==   86_i8
+172_u8.zigzag() ==  -86_i8
+173_u8.zigzag() ==   87_i8
+174_u8.zigzag() ==  -87_i8
+175_u8.zigzag() ==   88_i8
+176_u8.zigzag() ==  -88_i8
+177_u8.zigzag() ==   89_i8
+178_u8.zigzag() ==  -89_i8
+179_u8.zigzag() ==   90_i8
+180_u8.zigzag() ==  -90_i8
+181_u8.zigzag() ==   91_i8
+182_u8.zigzag() ==  -91_i8
+183_u8.zigzag() ==   92_i8
+184_u8.zigzag() ==  -92_i8
+185_u8.zigzag() ==   93_i8
+186_u8.zigzag() ==  -93_i8
+187_u8.zigzag() ==   94_i8
+188_u8.zigzag() ==  -94_i8
+189_u8.zigzag() ==   95_i8
+190_u8.zigzag() ==  -95_i8
+191_u8.zigzag() ==   96_i8
+192_u8.zigzag() ==  -96_i8
+193_u8.zigzag() ==   97_i8
+194_u8.zigzag() ==  -97_i8
+195_u8.zigzag() ==   98_i8
+196_u8.zigzag() ==  -98_i8
+197_u8.zigzag() ==   99_i8
+198_u8.zigzag() ==  -99_i8
+199_u8.zigzag() ==  100_i8
+200_u8.zigzag() == -100_i8
+201_u8.zigzag() ==  101_i8
+202_u8.zigzag() == -101_i8
+203_u8.zigzag() ==  102_i8
+204_u8.zigzag() == -102_i8
+205_u8.zigzag() ==  103_i8
+206_u8.zigzag() == -103_i8
+207_u8.zigzag() ==  104_i8
+208_u8.zigzag() == -104_i8
+209_u8.zigzag() ==  105_i8
+210_u8.zigzag() == -105_i8
+211_u8.zigzag() ==  106_i8
+212_u8.zigzag() == -106_i8
+213_u8.zigzag() ==  107_i8
+214_u8.zigzag() == -107_i8
+215_u8.zigzag() ==  108_i8
+216_u8.zigzag() == -108_i8
+217_u8.zigzag() ==  109_i8
+218_u8.zigzag() == -109_i8
+219_u8.zigzag() ==  110_i8
+220_u8.zigzag() == -110_i8
+221_u8.zigzag() ==  111_i8
+222_u8.zigzag() == -111_i8
+223_u8.zigzag() ==  112_i8
+224_u8.zigzag() == -112_i8
+225_u8.zigzag() ==  113_i8
+226_u8.zigzag() == -113_i8
+227_u8.zigzag() ==  114_i8
+228_u8.zigzag() == -114_i8
+229_u8.zigzag() ==  115_i8
+230_u8.zigzag() == -115_i8
+231_u8.zigzag() ==  116_i8
+232_u8.zigzag() == -116_i8
+233_u8.zigzag() ==  117_i8
+234_u8.zigzag() == -117_i8
+235_u8.zigzag() ==  118_i8
+236_u8.zigzag() == -118_i8
+237_u8.zigzag() ==  119_i8
+238_u8.zigzag() == -119_i8
+239_u8.zigzag() ==  120_i8
+240_u8.zigzag() == -120_i8
+241_u8.zigzag() ==  121_i8
+242_u8.zigzag() == -121_i8
+243_u8.zigzag() ==  122_i8
+244_u8.zigzag() == -122_i8
+245_u8.zigzag() ==  123_i8
+246_u8.zigzag() == -123_i8
+247_u8.zigzag() ==  124_i8
+248_u8.zigzag() == -124_i8
+249_u8.zigzag() ==  125_i8
+250_u8.zigzag() == -125_i8
+251_u8.zigzag() ==  126_i8
+252_u8.zigzag() == -126_i8
+253_u8.zigzag() ==  127_i8
+254_u8.zigzag() == -127_i8
+255_u8.zigzag() == -128_i8
