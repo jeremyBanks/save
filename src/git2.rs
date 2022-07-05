@@ -7,7 +7,7 @@ pub(self) use ::git2::{
 };
 use {
     crate::{zigzag::ZigZag, *},
-    std::cmp::Ordering,
+    std::{cmp::Ordering, time::Instant},
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
@@ -345,70 +345,20 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         let thread_count = num_cpus::get();
         trace!("Using {thread_count} threads");
 
-        let best: RwLock<Option<Hit>> = RwLock::new(None);
-
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        struct Hit {
-            /// commit timestamp - target timestamp
-            commit_offset: i64,
-            /// author timestamp - target timestamp
-            author_offset: i64,
-        }
-
-        // Okay, what about a total mapping?
-        let mut min = 0i64;
-        let mut max = 0i64;
-        let mut options = vec![(min, max)];
-
-        loop {
-            if min <= -max {
-                max += 1;
-                for i in 0..((max - min) as u64) {
-                    let lower = i.zigzag();
-                    options.push((lower, max));
-                }
-            } else {
-                min -= 1;
-                for upper in min..=max {
-                    options.push((min, upper));
-                }
-            }
-        }
-
-        impl Hit {
-            fn sort_key(&self) -> (u64, u64) {
-                let commit_offset_zigzag = self.commit_offset.zigzag();
-                let author_offset_zigzag = self.author_offset.zigzag();
-                (commit_offset_zigzag, author_offset_zigzag)
-            }
-        }
-
-        impl Ord for Hit {
-            fn cmp(&self, other: &Self) -> Ordering {
-                self.sort_key().cmp(&other.sort_key())
-            }
-        }
-
-        impl PartialOrd for Hit {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
+        let best: RwLock<Option<u64>> = RwLock::new(None);
 
         std::thread::scope(|scope| {
+            let start_time = Instant::now();
+
             for thread_index in 0..thread_count {
-                scope.spawn(|| {});
+                scope.spawn(|| for local_index in 0.. {});
             }
         });
 
         let commit = self.borrow();
         let min_timestamp = min_timestamp
             .into()
-            .unwrap_or_else(|| commit.author().when().seconds());
-
-        // TODO: actually short-circuit on full matches so this isn't always an infinite
-        // loop
-        let max_timestamp = target_timestamp.into().unwrap_or(i64::MAX);
+            .unwrap_or_else(|| commit.committer().when().seconds());
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
 

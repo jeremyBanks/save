@@ -64,9 +64,7 @@ macro_rules! impls {
                 fn zugzug(self) -> $unsigned {
                     let (lo, hi) = self;
                     debug_assert!(lo <= hi);
-                    let lo_magnitude = (lo as $working * 2 - 1).abs();
-                    let hi_magnitude = (hi as $working * 2 - 1).abs();
-                    let (alfa, bravo) = if lo_magnitude > hi_magnitude {
+                    let (alfa, bravo) = if (lo as $working * 2 - 1).abs() > (hi as $working * 2 - 1).abs() {
                         (lo, hi)
                     } else {
                         (hi, lo)

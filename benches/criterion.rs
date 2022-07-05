@@ -137,15 +137,8 @@ fn bench_generation_number(c: &mut Criterion) {
 
         let commit = repo.head().unwrap().peel_to_commit().unwrap();
 
-        let generation_number = commit.generation_number();
-        assert_eq!(generation_number, commit.generation_number_via_petgraph());
-
         c.bench_with_input(format!("{name}/clunky graph"), &commit, |b, commit| {
-            b.iter(|| commit.generation_number());
-        });
-
-        c.bench_with_input(format!("{name}/clunky petgraph"), &commit, |b, commit| {
-            b.iter(|| commit.generation_number_via_petgraph());
+            b.iter(|| commit.graph_stats());
         });
     }
 }

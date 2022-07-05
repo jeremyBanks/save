@@ -15,7 +15,6 @@
     unused_import_braces,
     unused_lifetimes,
     unused_qualifications,
-    unused_crate_dependencies,
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
@@ -64,10 +63,9 @@
 pub mod cli;
 pub mod git2;
 pub mod hex;
-mod zigzag;
+pub mod zigzag;
 #[allow(unused)]
 pub(crate) use tracing::{
     debug, debug_span, error, error_span, info, info_span, instrument, trace, trace_span, warn,
     warn_span,
 };
-pub use zigzag::{ZigZag, ZugZug};

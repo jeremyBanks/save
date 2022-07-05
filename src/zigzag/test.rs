@@ -133,7 +133,7 @@ fn zugzug_snapshot() {
     let mut actual = String::new();
     for i in 0..1024u16 {
         let (x, y) = i.zugzug();
-        actual += &format!("{i:>3}.zugzug() == ({x:>3}, {y:>3})\n");
+        actual += &format!("{i:>4}.zugzug() == ({x:>3}, {y:>3})\n");
     }
     expect_file!("zugzug.txt").assert_eq(&actual);
 }
