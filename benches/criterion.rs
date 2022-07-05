@@ -128,7 +128,8 @@ fn bench_generation_number(c: &mut Criterion) {
     let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let test_repos_root = project_root.join("test_repos");
 
-    for name in ["deno"] {
+    {
+        let name = "deno";
         //, "git", "rust", "typescript"] {
         let repo_path = test_repos_root.join(name);
         let repo = Repository::open(&repo_path)

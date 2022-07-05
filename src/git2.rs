@@ -398,74 +398,76 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             commit_lines.join("\n")
         };
 
-        let (_best_score, best_committer_timestamp, best_author_timestamp, best_oid, best_body) =
-            ((min_timestamp..=max_timestamp)
-                .into_par_iter()
-                .map(|author_timestamp| {
-                    (author_timestamp..=max_timestamp)
-                        .into_par_iter()
-                        .map(|committer_timestamp| {
-                            let candidate_body =
-                                commit_create_buffer(author_timestamp, committer_timestamp);
-                            let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
+        // let (_best_score, best_committer_timestamp, best_author_timestamp, best_oid,
+        // best_body) =     ((min_timestamp..=max_timestamp)
+        //         .into_par_iter()
+        //         .map(|author_timestamp| {
+        //             (author_timestamp..=max_timestamp)
+        //                 .into_par_iter()
+        //                 .map(|committer_timestamp| {
+        //                     let candidate_body =
+        //                         commit_create_buffer(author_timestamp,
+        // committer_timestamp);                     let candidate_oid =
+        // Oid::for_object("commit", candidate_body.as_ref());
 
-                            let score = candidate_oid
-                                .as_bytes()
-                                .iter()
-                                .zip(target_prefix.iter())
-                                .map(|(a, b)| (a ^ b))
-                                .zip(target_mask.iter())
-                                .map(|(score, mask)| score & mask)
-                                .collect::<Vec<u8>>();
+        //                     let score = candidate_oid
+        //                         .as_bytes()
+        //                         .iter()
+        //                         .zip(target_prefix.iter())
+        //                         .map(|(a, b)| (a ^ b))
+        //                         .zip(target_mask.iter())
+        //                         .map(|(score, mask)| score & mask)
+        //                         .collect::<Vec<u8>>();
 
-                            (
-                                score,
-                                committer_timestamp,
-                                author_timestamp,
-                                candidate_oid,
-                                candidate_body,
-                            )
-                        })
-                        .min()
-                        .unwrap()
-                }))
-            .min()
-            .unwrap();
+        //                     (
+        //                         score,
+        //                         committer_timestamp,
+        //                         author_timestamp,
+        //                         candidate_oid,
+        //                         candidate_body,
+        //                     )
+        //                 })
+        //                 .min()
+        //                 .unwrap()
+        //         }))
+        //     .min()
+        //     .unwrap();
 
-        let brute_forced_commit_oid = commit
-            .amend(
-                None,
-                Signature::new(
-                    commit.author().name().unwrap(),
-                    commit.author().email().unwrap(),
-                    &git2::Time::new(
-                        best_author_timestamp,
-                        commit.author().when().offset_minutes(),
-                    ),
-                )
-                .as_ref()
-                .ok(),
-                Signature::new(
-                    commit.committer().name().unwrap(),
-                    commit.committer().email().unwrap(),
-                    &git2::Time::new(
-                        best_committer_timestamp,
-                        commit.committer().when().offset_minutes(),
-                    ),
-                )
-                .as_ref()
-                .ok(),
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        assert_eq!(best_oid, brute_forced_commit_oid);
+        // let brute_forced_commit_oid = commit
+        //     .amend(
+        //         None,
+        //         Signature::new(
+        //             commit.author().name().unwrap(),
+        //             commit.author().email().unwrap(),
+        //             &git2::Time::new(
+        //                 best_author_timestamp,
+        //                 commit.author().when().offset_minutes(),
+        //             ),
+        //         )
+        //         .as_ref()
+        //         .ok(),
+        //         Signature::new(
+        //             commit.committer().name().unwrap(),
+        //             commit.committer().email().unwrap(),
+        //             &git2::Time::new(
+        //                 best_committer_timestamp,
+        //                 commit.committer().when().offset_minutes(),
+        //             ),
+        //         )
+        //         .as_ref()
+        //         .ok(),
+        //         None,
+        //         None,
+        //         None,
+        //     )
+        //     .unwrap();
+        // assert_eq!(best_oid, brute_forced_commit_oid);
 
-        let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
-        assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
+        // let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
+        // assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
 
-        brute_forced_commit
+        // brute_forced_commit
+        todo!()
     }
 }
 
