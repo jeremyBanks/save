@@ -417,7 +417,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                         let index = local_index * thread_count + thread_index;
                         if index % 64 == 0 {
                             if let Some(ref best) = *best.read() {
-                                if best.index < index {
+                                let best_index = best.index;
+                                if best_index < index {
+                                    trace!("Ending thread {thread_index} as it's past the current-best {best_index}");
                                     break;
                                 }
                             }
