@@ -415,7 +415,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                 scope.spawn(move || {
                     for local_index in 0u64.. {
                         let index = local_index * thread_count + thread_index;
-                        if index % 128 == 0 {
+                        if index % 64 == 0 {
                             if let Some(ref best) = *best.read() {
                                 if best.index < index {
                                     break;
