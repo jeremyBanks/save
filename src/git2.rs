@@ -458,6 +458,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                                     body: candidate_body,
                                     oid: candidate_oid,
                                 });
+                                trace!("Ending {thread_index} with a new best: {index}");
+                            } else {
+                                trace!("Ending {thread_index} with a hit but it's worse than the current best.");
                             }
 
                             break;
