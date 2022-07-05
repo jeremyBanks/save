@@ -334,10 +334,15 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         min_timestamp: impl Into<Option<i64>>,
         target_timestamp: impl Into<Option<i64>>,
     ) -> Commit<'repo> {
-        let target_mask = target_mask.unwrap_or({
-            static DEFAULT: &[u8] = &[0xFF; 20];
-            &DEFAULT[..target_prefix.len().min(DEFAULT.len())]
-        });
+        let target_prefix = target_prefix.to_vec();
+        let target_mask = target_mask
+            .unwrap_or({
+                static DEFAULT: &[u8] = &[0xFF; 20];
+                &DEFAULT[..target_prefix.len().min(DEFAULT.len())]
+            })
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
         trace!("Brute forcing a timestamp for {target_prefix:2x?} with mask {target_mask:2x?}");
 
         let thread_count = num_cpus::get() as u64;
@@ -400,8 +405,12 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         let target_timestamp = target_timestamp;
         let min_timestamp = min_timestamp;
 
+        let target_mask = &target_mask;
+        let target_prefix = &target_prefix;
+
         std::thread::scope(|scope| {
             let best = &best;
+
             for thread_index in 0..thread_count {
                 scope.spawn(move || {
                     for local_index in 0u64.. {
@@ -428,7 +437,15 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
                         let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
 
-                        if "masked-blah".len() > 0 {
+                        if candidate_oid
+                            .as_bytes()
+                            .iter()
+                            .zip(target_prefix.iter())
+                            .map(|(a, b)| (a ^ b))
+                            .zip(target_mask.iter())
+                            .map(|(x, mask)| x & *mask)
+                            .all(|x| x == 0)
+                        {
                             let mut best = best.write();
                             if best.is_none() || index < best.as_ref().unwrap().index {
                                 *best = Some(Best {
