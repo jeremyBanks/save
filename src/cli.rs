@@ -114,12 +114,6 @@ pub struct Args {
 /// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
-    let target = args
-        .prefix_hex
-        .as_ref()
-        .map(|s| crate::hex::decode_hex_nibbles(s))
-        .unwrap_or_default();
-
     let repo = open_or_init_repo(&args)?;
 
     let head = match repo.head() {
@@ -161,6 +155,9 @@ pub fn main(args: Args) -> Result<()> {
     }
 
     let tree4 = tree.to_string()[..4].to_string().to_ascii_uppercase();
+
+    let target = crate::hex::decode_hex_nibbles(args.prefix_hex.unwrap_or_else(|| tree4.clone()));
+
     let tree = repo.find_tree(tree)?;
 
     let mut message = String::new();

@@ -6,8 +6,7 @@ pub(self) use ::git2::{
     Signature, Tag, Time, Tree,
 };
 use {
-    crate::{zigzag::ZigZag, *},
-    std::{cmp::Ordering, time::Instant},
+    crate::{zigzag::ZugZug, *},
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
@@ -18,7 +17,6 @@ use {
             visit::Topo,
             EdgeDirection::{Incoming, Outgoing},
         },
-        rayon::iter::{IntoParallelIterator, ParallelIterator},
         std::{
             borrow::Borrow,
             fmt::Debug,
@@ -342,23 +340,15 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         });
         trace!("Brute forcing a timestamp for {target_prefix:2x?} with mask {target_mask:2x?}");
 
-        let thread_count = num_cpus::get();
+        let thread_count = num_cpus::get() as u64;
         trace!("Using {thread_count} threads");
-
-        let best: RwLock<Option<u64>> = RwLock::new(None);
-
-        std::thread::scope(|scope| {
-            let start_time = Instant::now();
-
-            for thread_index in 0..thread_count {
-                scope.spawn(|| for local_index in 0.. {});
-            }
-        });
 
         let commit = self.borrow();
         let min_timestamp = min_timestamp
             .into()
             .unwrap_or_else(|| commit.committer().when().seconds());
+
+        let target_timestamp = target_timestamp.into().unwrap_or(min_timestamp);
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
 
@@ -398,76 +388,101 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             commit_lines.join("\n")
         };
 
-        // let (_best_score, best_committer_timestamp, best_author_timestamp, best_oid,
-        // best_body) =     ((min_timestamp..=max_timestamp)
-        //         .into_par_iter()
-        //         .map(|author_timestamp| {
-        //             (author_timestamp..=max_timestamp)
-        //                 .into_par_iter()
-        //                 .map(|committer_timestamp| {
-        //                     let candidate_body =
-        //                         commit_create_buffer(author_timestamp,
-        // committer_timestamp);                     let candidate_oid =
-        // Oid::for_object("commit", candidate_body.as_ref());
+        let best: RwLock<Option<Best>> = RwLock::new(None);
+        struct Best {
+            index: u64,
+            body: String,
+            oid: Oid,
+            author_timestamp: i64,
+            committer_timestamp: i64,
+        }
 
-        //                     let score = candidate_oid
-        //                         .as_bytes()
-        //                         .iter()
-        //                         .zip(target_prefix.iter())
-        //                         .map(|(a, b)| (a ^ b))
-        //                         .zip(target_mask.iter())
-        //                         .map(|(score, mask)| score & mask)
-        //                         .collect::<Vec<u8>>();
+        let target_timestamp = target_timestamp;
+        let min_timestamp = min_timestamp;
 
-        //                     (
-        //                         score,
-        //                         committer_timestamp,
-        //                         author_timestamp,
-        //                         candidate_oid,
-        //                         candidate_body,
-        //                     )
-        //                 })
-        //                 .min()
-        //                 .unwrap()
-        //         }))
-        //     .min()
-        //     .unwrap();
+        std::thread::scope(|scope| {
+            let best = &best;
+            for thread_index in 0..thread_count {
+                scope.spawn(move || {
+                    for local_index in 0u64.. {
+                        let index = local_index * thread_count + thread_index;
+                        if index % 128 == 0 {
+                            if let Some(ref best) = *best.read() {
+                                if best.index < index {
+                                    break;
+                                }
+                            }
+                        }
 
-        // let brute_forced_commit_oid = commit
-        //     .amend(
-        //         None,
-        //         Signature::new(
-        //             commit.author().name().unwrap(),
-        //             commit.author().email().unwrap(),
-        //             &git2::Time::new(
-        //                 best_author_timestamp,
-        //                 commit.author().when().offset_minutes(),
-        //             ),
-        //         )
-        //         .as_ref()
-        //         .ok(),
-        //         Signature::new(
-        //             commit.committer().name().unwrap(),
-        //             commit.committer().email().unwrap(),
-        //             &git2::Time::new(
-        //                 best_committer_timestamp,
-        //                 commit.committer().when().offset_minutes(),
-        //             ),
-        //         )
-        //         .as_ref()
-        //         .ok(),
-        //         None,
-        //         None,
-        //         None,
-        //     )
-        //     .unwrap();
-        // assert_eq!(best_oid, brute_forced_commit_oid);
+                        let (d_author, d_committer) = index.zugzug();
 
-        // let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
-        // assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
+                        let author_timestamp = target_timestamp + d_author;
+                        let committer_timestamp = target_timestamp + d_committer;
 
-        // brute_forced_commit
-        todo!()
+                        if author_timestamp < min_timestamp {
+                            continue;
+                        }
+
+                        let candidate_body =
+                            commit_create_buffer(author_timestamp, committer_timestamp);
+
+                        let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
+
+                        if "masked-blah".len() > 0 {
+                            let mut best = best.write();
+                            if best.is_none() || index < best.as_ref().unwrap().index {
+                                *best = Some(Best {
+                                    index,
+                                    author_timestamp,
+                                    committer_timestamp,
+                                    body: candidate_body,
+                                    oid: candidate_oid,
+                                });
+                            }
+
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+
+        let best = best.into_inner().unwrap();
+
+        let brute_forced_commit_oid = commit
+            .amend(
+                None,
+                Signature::new(
+                    commit.author().name().unwrap(),
+                    commit.author().email().unwrap(),
+                    &git2::Time::new(
+                        best.author_timestamp,
+                        commit.author().when().offset_minutes(),
+                    ),
+                )
+                .as_ref()
+                .ok(),
+                Signature::new(
+                    commit.committer().name().unwrap(),
+                    commit.committer().email().unwrap(),
+                    &git2::Time::new(
+                        best.committer_timestamp,
+                        commit.committer().when().offset_minutes(),
+                    ),
+                )
+                .as_ref()
+                .ok(),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(best.oid, brute_forced_commit_oid);
+
+        let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
+        assert_eq!(best.body.as_bytes(), brute_forced_commit.to_bytes());
+
+        brute_forced_commit
     }
 }
 

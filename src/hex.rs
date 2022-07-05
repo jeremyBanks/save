@@ -47,6 +47,19 @@ pub struct MaskedBytes {
     pub mask: Vec<u8>,
 }
 
+impl From<Vec<u8>> for MaskedBytes {
+    fn from(bytes: Vec<u8>) -> Self {
+        let mask = vec![0xFF; bytes.len()];
+        Self { bytes, mask }
+    }
+}
+
+impl From<String> for MaskedBytes {
+    fn from(string: String) -> Self {
+        string.into_bytes().into()
+    }
+}
+
 impl IntoIterator for MaskedBytes {
     type IntoIter = std::iter::Zip<std::vec::IntoIter<u8>, std::vec::IntoIter<u8>>;
     type Item = (u8, u8);
