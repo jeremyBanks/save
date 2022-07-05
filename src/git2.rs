@@ -414,13 +414,17 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
             for thread_index in 0..thread_count {
                 threads.push(scope.spawn(move || {
+                    trace!("Starting thread {thread_index}.");
                     for local_index in 0u64.. {
                         let index = local_index * thread_count + thread_index;
-                        if local_index % 16 == 0 {
+                        if local_index % 64 == thread_index % 64 {
                             if let Some(ref best) = *best.read() {
                                 let best_index = best.index;
                                 if best_index < index {
-                                    trace!("Ending thread {thread_index} as it's past the current-best {best_index}");
+                                    trace!(
+                                        "Ending thread {thread_index} at {index} as it's past the \
+                                         current best index: {best_index}"
+                                    );
                                     break;
                                 }
                             }
@@ -460,7 +464,11 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                                 });
                                 trace!("Ending {thread_index} with a new best: {index}");
                             } else {
-                                trace!("Ending {thread_index} with a hit but it's worse than the current best.");
+                                let best_index = best.as_ref().unwrap().index;
+                                trace!(
+                                    "Ending {thread_index} with a hit at {index}, but that's \
+                                     worse than the current best: {best_index}"
+                                );
                             }
 
                             break;
