@@ -410,9 +410,10 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
 
         std::thread::scope(|scope| {
             let best = &best;
+            let mut threads = Vec::new();
 
             for thread_index in 0..thread_count {
-                scope.spawn(move || {
+                threads.push(scope.spawn(move || {
                     for local_index in 0u64.. {
                         let index = local_index * thread_count + thread_index;
                         if index % 64 == 0 {
@@ -462,7 +463,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                             break;
                         }
                     }
-                });
+                }));
             }
         });
 
