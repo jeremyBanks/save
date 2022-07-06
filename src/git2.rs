@@ -6,7 +6,7 @@ pub(self) use ::git2::{
     Signature, Tag, Time, Tree,
 };
 use {
-    crate::{zigzag::ZugZug, *},
+    crate::zigzag::ZugZug,
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
@@ -25,6 +25,7 @@ use {
             path::PathBuf,
         },
         tempfile::TempDir,
+        tracing::{debug, instrument, trace, warn},
     },
 };
 

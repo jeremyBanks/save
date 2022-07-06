@@ -3,9 +3,6 @@ use {
     num_integer::Roots,
 };
 
-#[cfg(test)]
-mod test;
-
 pub trait ZigZag {
     type Output;
 

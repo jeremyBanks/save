@@ -10,6 +10,7 @@ version = "0.7.0-dev.0"
 clap = { features = ["derive", "env", "cargo", "unicode", "wrap_help"], version = "3.2.8" }
 color-eyre = "0.6.1"
 digest = "0.10.3"
+expect-test = { version = "1.4.0", git = "https://github.com/jeremyBanks/expect-test", rev = "bf056e6c5cd3baed9ad2ef3d30bc06dad2778089" }
 eyre = "0.6.8"
 git2 = "0.14.4"
 home = "0.5.3"
@@ -31,7 +32,6 @@ tracing-subscriber = { features = ["env-filter"], version = "0.3.14" }
 [dev-dependencies]
 criterion = { features = ["html_reports"], version = "0.3.5" }
 crossterm = "0.24.0"
-expect-test = { version = "1.4.0", git = "https://github.com/jeremyBanks/expect-test", rev = "bf056e6c5cd3baed9ad2ef3d30bc06dad2778089" }
 iai = "0.1.1"
 rand = "0.8.5"
 rand_pcg = "0.3.1"

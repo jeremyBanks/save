@@ -62,9 +62,5 @@
 pub mod cli;
 pub mod git2;
 pub mod hex;
+pub mod testing;
 pub mod zigzag;
-#[allow(unused)]
-pub(crate) use tracing::{
-    debug, debug_span, error, error_span, info, info_span, instrument, trace, trace_span, warn,
-    warn_span,
-};
