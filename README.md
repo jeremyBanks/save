@@ -26,21 +26,27 @@ OPTIONS:
     -a, --all
             Commit all files in the repository. This is the default.
             
-            The commit will fail if there are no changes.
+            The commit will fail if there are no changes unless `--allow-empty` is set.
 
     -s, --staged
             Commit only files that have been explicitly staged with `git add`.
             
             This is like the default behaviour of `git commit`. The commit will fail if there are no
-            staged changes.
+            staged changes unless `--allow-empty` is set.
 
     -e, --empty
             Don't include any file changes in the commit.
             
             This commit will have the same tree hash as its parent.
 
+        --allow-empty
+            Create the commit even if it contains no changes
+
     -n, --dry-run
-            Prepare the commit, but don't actually update any references in Git
+            Prepare the commit, but don't actually update any references in Git.
+            
+            The commit will be written to the Git database, so it is still possible for the user to
+            manually add a reference to it.
 
     -x, --prefix <PREFIX_HEX>
             The required commit hash or prefix, in hex.

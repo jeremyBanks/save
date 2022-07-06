@@ -1035,6 +1035,7 @@ dependencies = [
 name = "save"
 version = "0.20220708.0"
 dependencies = [
+ "bstr",
  "clap 3.2.8",
  "color-eyre",
  "criterion",

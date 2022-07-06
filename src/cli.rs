@@ -42,14 +42,16 @@ pub struct Args {
 
     /// Commit all files in the repository. This is the default.
     ///
-    /// The commit will fail if there are no changes.
+    /// The commit will fail if there are no changes unless `--allow-empty` is
+    /// set.
     #[clap(long, short = 'a', conflicts_with = "staged", conflicts_with = "empty")]
     pub all: bool,
 
     /// Commit only files that have been explicitly staged with `git add`.
     ///
     /// This is like the default behaviour of `git commit`.
-    /// The commit will fail if there are no staged changes.
+    /// The commit will fail if there are no staged changes unless
+    /// `--allow-empty` is set.
     #[clap(long, short = 's', conflicts_with = "all", conflicts_with = "empty")]
     pub staged: bool,
 
@@ -59,7 +61,14 @@ pub struct Args {
     #[clap(long, short = 'e', conflicts_with = "all", conflicts_with = "staged")]
     pub empty: bool,
 
+    /// Create the commit even if it contains no changes.
+    #[clap(long)]
+    pub allow_empty: bool,
+
     /// Prepare the commit, but don't actually update any references in Git.
+    ///
+    /// The commit will be written to the Git database, so it is still possible
+    /// for the user to manually add a reference to it.
     #[clap(long, short = 'n')]
     pub dry_run: bool,
 
@@ -223,13 +232,18 @@ pub fn main(args: Args) -> Result<()> {
         target_timestamp,
     );
 
+    debug!("Prepared commit {}", commit.id());
+
     if !args.dry_run {
         let mut head_ref = repo.head()?;
+        info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
         if head_ref.is_branch() {
             head_ref.set_target(commit.id(), "committed via save")?;
         } else {
             repo.set_head(&commit.id().to_string())?;
         }
+    } else {
+        info!("Not updating HEAD because this is a dry run.");
     }
 
     eprintln!();
@@ -245,8 +259,11 @@ pub fn main(args: Args) -> Result<()> {
             "--decorate",
             "-n",
             "2",
+            &commit.id().to_string(),
         ])
         .status()?;
+
+    eprintln!();
 
     Command::new("git")
         .args(&["--no-pager", "reflog", "-n", "4"])
