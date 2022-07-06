@@ -10,5 +10,5 @@ fn readme() {
     actual.push_str("```\n");
     actual.push_str(&String::from_utf8(output.stdout).unwrap());
     actual.push_str("```\n");
-    expect_file!("../README.md").assert_eq(&actual);
+    expect_file("../README.md").assert_eq(&actual);
 }

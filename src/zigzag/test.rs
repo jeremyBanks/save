@@ -95,7 +95,7 @@ fn zigzag_snapshot() {
         actual += "\n";
     }
 
-    expect_file!("zigzag.txt").assert_eq(&actual);
+    expect_file("zigzag.txt").assert_eq(&actual);
 }
 
 #[test]
@@ -160,5 +160,5 @@ fn zugzug_snapshot() {
         }
     }
 
-    expect_file!("zugzug.txt").assert_eq(&actual);
+    expect_file("zugzug.txt").assert_eq(&actual);
 }

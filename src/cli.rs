@@ -102,6 +102,10 @@ pub struct Args {
     #[clap(long, short = 'q', parse(from_occurrences), conflicts_with = "verbose")]
     pub quiet: i32,
 
+    /// Override the system clock timestamp with a custom one.
+    #[clap(long = "squash", alias = "amend")]
+    pub squash: Option<Option<i32>>,
+
     /// Increase log verbosity. May be used multiple times.
     #[clap(long, short = 'v', parse(from_occurrences), conflicts_with = "quiet")]
     pub verbose: i32,
