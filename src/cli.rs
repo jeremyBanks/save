@@ -2,14 +2,16 @@
 
 use {
     crate::git2::*,
-    clap::{AppSettings, Parser},
-    eyre::{bail, Result},
-    git2::{
-        Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
+    ::{
+        clap::{AppSettings, Parser},
+        eyre::{bail, Result},
+        git2::{
+            Commit, ErrorCode, Repository, RepositoryInitOptions, RepositoryState, Signature, Time,
+        },
+        once_cell::sync::Lazy,
+        std::{env, fmt::Write, fs, process::Command},
+        tracing::{debug, info, instrument, trace, warn},
     },
-    once_cell::sync::Lazy,
-    std::{env, fmt::Write, fs, process::Command},
-    tracing::{debug, info, instrument, trace, warn},
 };
 
 /// Would you like to SAVE the change?
@@ -19,18 +21,10 @@ use {
 #[clap(
     after_help = {
         static AFTER_HELP: Lazy<String> = Lazy::new(|| { format!(
-            "{}\n    https://docs.rs/{name}/{semver}\n    https://crates.io/crates/{name}\n    {repository}",
+            "{}\n    https://docs.rs/{name}\n    https://crates.io/crates/{name}",
             "LINKS:",
             name = env!("CARGO_PKG_NAME"),
-            semver = {
-                if env!("CARGO_PKG_VERSION_PRE", "").len() > 0 {
-                    format!("%3C%3D{}", env!("CARGO_PKG_VERSION"))
-                } else {
-                    env!("CARGO_PKG_VERSION").to_string()
-                }
-            },
-            repository = env!("CARGO_PKG_REPOSITORY"))
-        });
+    )});
         AFTER_HELP.as_ref()
     },
     dont_collapse_args_in_usage = true,
@@ -99,12 +93,13 @@ pub struct Args {
     pub dry_run: bool,
 
     /// Decrease log verbosity. May be used multiple times.
-    #[clap(long, short = 'q', parse(from_occurrences), conflicts_with = "verbose")]
+    #[clap(long, short = 'q', parse(from_occurrences))]
     pub quiet: i32,
 
-    /// Override the system clock timestamp with a custom one.
-    #[clap(long = "squash", alias = "amend")]
-    pub squash: Option<Option<i32>>,
+    /// Squashes these changes into the first parent. May be used multiple
+    /// times.
+    #[clap(long = "squash", parse(from_occurrences), alias = "amend")]
+    pub squash: u32,
 
     /// Increase log verbosity. May be used multiple times.
     #[clap(long, short = 'v', parse(from_occurrences), conflicts_with = "quiet")]

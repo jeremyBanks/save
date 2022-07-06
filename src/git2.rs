@@ -278,31 +278,31 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         }
     }
 
-    // /// Returns a new [`Commit`] with the result of squashing this [`Commit`]
-    // /// with its `depth` first-parent ancestors, and any merged-in
-    // /// descendant branches.
-    // #[instrument(level = "debug")]
-    // #[must_use]
-    // fn squashed(&self, depth: u32) -> Commit<'repo> {
-    //     let commit: &Commit<'repo> = self.borrow();
-    //     if depth == 0 {
-    //         return commit.clone();
-    //     }
+    /// Returns a new [`Commit`] with the result of squashing this [`Commit`]
+    /// with its `depth` first-parent ancestors, and any merged-in
+    /// descendant branches.
+    #[instrument(level = "debug")]
+    #[must_use]
+    fn squashed(&self, depth: u32) -> Commit<'repo> {
+        let commit: &Commit<'repo> = self.borrow();
+        if depth == 0 {
+            return commit.clone();
+        }
 
-    //     let _merged_commits: HashSet<Oid> = [commit.id()].into();
+        // let _merged_commits: HashSet<Oid> = [commit.id()].into();
 
-    //     // let mut tail: Commit = commit.clone();
-    //     // for _ in 0..depth {
-    //     //     let mut first_parent = tail.parents().next().unwrap().clone();
-    //     //     merged_commits.insert(first_parent.id());
-    //     //     tail = first_parent;
+        // let mut tail: Commit = commit.clone();
+        // for _ in 0..depth {
+        //     let mut first_parent = tail.parents().next().unwrap().clone();
+        //     merged_commits.insert(first_parent.id());
+        //     tail = first_parent;
 
-    //     //     // we need to collect all of the non-first parents, and walk all
-    // of     //     // their ancestors to see if they're merged in or not
-    //     // }
+        //     // we need to collect all of the non-first parents, and walk all
+        //     // their ancestors to see if they're merged in or not
+        // }
 
-    //     todo!()
-    // }
+        todo!()
+    }
 
     /// Modifies the committer and author timestamps on a commit to produce a
     /// commit ID as close as possible to a given target, within a timestamp

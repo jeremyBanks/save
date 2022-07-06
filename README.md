@@ -67,6 +67,9 @@ OPTIONS:
     -q, --quiet
             Decrease log verbosity. May be used multiple times
 
+        --squash
+            Squashes these changes into the first parent. May be used multiple times
+
     -v, --verbose
             Increase log verbosity. May be used multiple times
 
@@ -77,7 +80,6 @@ OPTIONS:
             Print version information
 
 LINKS:
-    https://docs.rs/save/%3C%3D0.7.0-dev.0
+    https://docs.rs/save
     https://crates.io/crates/save
-
 ```
