@@ -170,7 +170,7 @@ pub fn main(args: Args) -> Result<()> {
             } else if args.empty {
                 info!("Committing with no changes.");
             } else {
-                info!("Nothing to commit (use --empty if this is intentional).");
+                warn!("Nothing to commit. Use --empty or --allow-empty if this is intentional.");
                 return Ok(());
             }
         }
