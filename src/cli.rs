@@ -20,11 +20,11 @@ use {
 #[derive(Parser, Debug, Clone)]
 #[clap(
     after_help = {
-        static AFTER_HELP: Lazy<String> = Lazy::new(|| { format!(
-            "{}\n    https://docs.rs/{name}\n    https://crates.io/crates/{name}",
-            "LINKS:",
+        static AFTER_HELP: Lazy<String> = Lazy::new(|| format!(
+            "LINKS:\n    https://docs.rs/{name}/{version}\n    https://crates.io/crates/{name}/{version}",
             name = env!("CARGO_PKG_NAME"),
-    )});
+            version = env!("CARGO_PKG_VERSION"),
+        ));
         AFTER_HELP.as_ref()
     },
     dont_collapse_args_in_usage = true,
@@ -40,7 +40,7 @@ pub struct Args {
     pub message: Option<String>,
 
     /// Adds another parent to this commit. May be used multiple times.
-    #[clap(long, hidden = true)]
+    #[clap(long)]
     pub add_parent: Vec<String>,
 
     /// Commit all files in the repository. This is the default.
@@ -60,7 +60,7 @@ pub struct Args {
     pub prefix_hex: Option<String>,
 
     /// Override the system clock timestamp with a custom one.
-    #[clap(long, short = 't', env = "SAVE_TIMESTAMP", hidden = true)]
+    #[clap(long, short = 't', env = "SAVE_TIMESTAMP")]
     pub timestamp: Option<i64>,
 
     /// Use the next available timestamp after the previous commit, regardless
@@ -72,7 +72,7 @@ pub struct Args {
     ///
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
-    #[clap(long, short = '0', env = "SAVE_TIMELESS", hidden = true)]
+    #[clap(long, short = '0', env = "SAVE_TIMELESS")]
     pub timeless: bool,
 
     /// The name to use for the commit's author and committer.
@@ -99,7 +99,7 @@ pub struct Args {
     /// Squashes these changes into the first parent. May be used multiple
     /// times to squash multiple ancestors, or once to have the same effect
     /// as git's `--amend`.
-    #[clap(long, parse(from_occurrences), visible_alias = "amend", hidden = true)]
+    #[clap(long, parse(from_occurrences), visible_alias = "amend")]
     pub squash: u32,
 
     /// Increase log verbosity. May be used multiple times.

@@ -10,7 +10,19 @@ fn readme() {
         .unwrap()
         .wait_with_output()
         .unwrap();
-    actual.push_str("```\n");
+    let version = env!("CARGO_PKG_VERSION");
+    actual.push_str(&format!(
+        "```sh
+$ cargo install save --version {version}
+```
+
+```sh
+$ save --help
+```
+
+```text
+"
+    ));
     actual.push_str(&String::from_utf8(output.stdout).unwrap());
     actual.push_str("```\n");
     assert_at("../README.md", &actual);

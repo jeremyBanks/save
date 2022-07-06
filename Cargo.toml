@@ -50,7 +50,3 @@ post-release-commit-message = "v{{next_version}}"
 pre-release-commit-message = "v{{version}}"
 tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"
 tag-name = "{{version}}"
-
-[package.metadata.docs.rs]
-rustdoc-args = ["--document-private-items"]
-cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples=all"]
