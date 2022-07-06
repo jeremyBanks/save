@@ -5,10 +5,7 @@ use {
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
-        git2::{
-            Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote,
-            Repository, Signature, Tag, Time, Tree,
-        },
+        git2::{Commit, Index, ObjectType, Oid, Repository, Signature},
         itertools::Itertools,
         parking_lot::RwLock,
         petgraph::{

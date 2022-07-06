@@ -33,25 +33,35 @@ use {
     version
 )]
 pub struct Args {
-    /// Use this commit message, instead of the default.
+    /// The commit message.
     ///
-    /// [default: generated from generation number, tree hash, and parents]
+    /// [default: a short string based on the commit's tree hash and ancestry
+    /// graph]
     #[clap(long, short = 'm', env = "SAVE_COMMIT_MESSAGE")]
     pub message: Option<String>,
 
-    /// Adds another parent to this commit. May be used multiple times.
-    #[clap(long)]
-    pub add_parent: Vec<String>,
-
     /// Commit all files in the repository. This is the default.
-    #[clap(long, short = 'a', conflicts_with = "empty")]
+    ///
+    /// The commit will fail if there are no changes.
+    #[clap(long, short = 'a', conflicts_with = "staged", conflicts_with = "empty")]
     pub all: bool,
+
+    /// Commit only files that have been explicitly staged with `git add`.
+    ///
+    /// This is like the default behaviour of `git commit`.
+    /// The commit will fail if there are no staged changes.
+    #[clap(long, short = 's', conflicts_with = "all", conflicts_with = "empty")]
+    pub staged: bool,
 
     /// Don't include any file changes in the commit.
     ///
     /// This commit will have the same tree hash as its parent.
-    #[clap(long, short = 'e', conflicts_with = "all")]
+    #[clap(long, short = 'e', conflicts_with = "all", conflicts_with = "staged")]
     pub empty: bool,
+
+    /// Prepare the commit, but don't actually update any references in Git.
+    #[clap(long, short = 'n')]
+    pub dry_run: bool,
 
     /// The required commit hash or prefix, in hex.
     ///
@@ -59,7 +69,7 @@ pub struct Args {
     #[clap(long = "prefix", short = 'x', env = "SAVE_COMMIT_PREFIX")]
     pub prefix_hex: Option<String>,
 
-    /// Override the system clock timestamp with a custom one.
+    /// Override the system clock timestamp value.
     #[clap(long, short = 't', env = "SAVE_TIMESTAMP")]
     pub timestamp: Option<i64>,
 
@@ -77,32 +87,37 @@ pub struct Args {
 
     /// The name to use for the commit's author and committer.
     ///
-    /// [default: name from git, or else from parent commit, or else "dev"]
+    /// [default: name from git, or else from parent commit, or else "user"]
     #[clap(long, env = "GIT_AUTHOR_NAME")]
     pub name: Option<String>,
 
     /// The email to use for the commit's author and committer.
     ///
     /// [default: email from git, or else from parent commit, or else
-    /// "dev@localhost"]
+    /// "user@localhost"]
     #[clap(long, env = "GIT_AUTHOR_EMAIL")]
     pub email: Option<String>,
 
-    /// Prepare the commit, but don't actually update any references in Git.
-    #[clap(long, short = 'n')]
-    pub dry_run: bool,
-
-    /// Decrease log verbosity. May be used multiple times.
-    #[clap(long, short = 'q', parse(from_occurrences))]
-    pub quiet: i32,
-
-    /// Squashes these changes into the first parent. May be used multiple
-    /// times to squash multiple ancestors, or once to have the same effect
-    /// as git's `--amend`.
+    /// Squashes these changes into the first parent. May be repeated multiple
+    /// times to squash multiple ancestors.
     #[clap(long, parse(from_occurrences), visible_alias = "amend")]
     pub squash: u32,
 
-    /// Increase log verbosity. May be used multiple times.
+    /// Adds another parent to the new commit. May be repeated to add multiple
+    /// parents.
+    #[clap(long = "add-parent")]
+    pub added_parent_ref: Vec<String>,
+
+    /// Removes a parent from the new commit. May be repeated to remove multiple
+    /// parents.
+    #[clap(long = "rm-parent")]
+    pub removed_parent_ref: Vec<String>,
+
+    /// Decrease log verbosity. May be repeated to decrease verbosity further.
+    #[clap(long, short = 'q', parse(from_occurrences))]
+    pub quiet: i32,
+
+    /// Increase log verbosity. May be repeated to increase verbosity further.
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
 }
@@ -231,6 +246,10 @@ pub fn main(args: Args) -> Result<()> {
             "-n",
             "2",
         ])
+        .status()?;
+
+    Command::new("git")
+        .args(&["--no-pager", "reflog", "-n", "4"])
         .status()?;
 
     eprintln!();

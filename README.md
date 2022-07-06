@@ -17,22 +17,30 @@ USAGE:
 
 OPTIONS:
     -m, --message <MESSAGE>
-            Use this commit message, instead of the default.
+            The commit message.
             
-            [default: generated from generation number, tree hash, and parents]
+            [default: a short string based on the commit's tree hash and ancestry graph]
             
             [env: SAVE_COMMIT_MESSAGE=]
 
-        --add-parent <ADD_PARENT>
-            Adds another parent to this commit. May be used multiple times
-
     -a, --all
-            Commit all files in the repository. This is the default
+            Commit all files in the repository. This is the default.
+            
+            The commit will fail if there are no changes.
+
+    -s, --staged
+            Commit only files that have been explicitly staged with `git add`.
+            
+            This is like the default behaviour of `git commit`. The commit will fail if there are no
+            staged changes.
 
     -e, --empty
             Don't include any file changes in the commit.
             
             This commit will have the same tree hash as its parent.
+
+    -n, --dry-run
+            Prepare the commit, but don't actually update any references in Git
 
     -x, --prefix <PREFIX_HEX>
             The required commit hash or prefix, in hex.
@@ -42,7 +50,7 @@ OPTIONS:
             [env: SAVE_COMMIT_PREFIX=]
 
     -t, --timestamp <TIMESTAMP>
-            Override the system clock timestamp with a custom one
+            Override the system clock timestamp value
             
             [env: SAVE_TIMESTAMP=]
 
@@ -62,31 +70,34 @@ OPTIONS:
         --name <NAME>
             The name to use for the commit's author and committer.
             
-            [default: name from git, or else from parent commit, or else "dev"]
+            [default: name from git, or else from parent commit, or else "user"]
             
             [env: GIT_AUTHOR_NAME=]
 
         --email <EMAIL>
             The email to use for the commit's author and committer.
             
-            [default: email from git, or else from parent commit, or else "dev@localhost"]
+            [default: email from git, or else from parent commit, or else "user@localhost"]
             
             [env: GIT_AUTHOR_EMAIL=]
 
-    -n, --dry-run
-            Prepare the commit, but don't actually update any references in Git
-
-    -q, --quiet
-            Decrease log verbosity. May be used multiple times
-
         --squash
-            Squashes these changes into the first parent. May be used multiple times to squash
-            multiple ancestors, or once to have the same effect as git's `--amend`
+            Squashes these changes into the first parent. May be repeated multiple times to squash
+            multiple ancestors
             
             [aliases: amend]
 
+        --add-parent <ADDED_PARENT_REF>
+            Adds another parent to the new commit. May be repeated to add multiple parents
+
+        --rm-parent <REMOVED_PARENT_REF>
+            Removes a parent from the new commit. May be repeated to remove multiple parents
+
+    -q, --quiet
+            Decrease log verbosity. May be repeated to decrease verbosity further
+
     -v, --verbose
-            Increase log verbosity. May be used multiple times
+            Increase log verbosity. May be repeated to increase verbosity further
 
     -h, --help
             Print help information
