@@ -102,7 +102,7 @@ pub struct Args {
     pub squash: u32,
 
     /// Increase log verbosity. May be used multiple times.
-    #[clap(long, short = 'v', parse(from_occurrences), conflicts_with = "quiet")]
+    #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
 }
 

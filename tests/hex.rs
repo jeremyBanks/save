@@ -23,7 +23,7 @@ fn hex() {
     );
     assert_debug_eq(
         "MaskedBytes { bytes: [0, 1, 35, 64], mask: [0, 255, 255, 240] }",
-        decode_hex_nibbles("__01234"),
+        decode_hex_nibbles("__01 2 3 4"),
     );
     assert_debug_eq(
         "MaskedBytes { bytes: [18, 52, 80], mask: [255, 255, 240] }",
