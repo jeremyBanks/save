@@ -68,7 +68,8 @@ OPTIONS:
             Decrease log verbosity. May be used multiple times
 
         --squash
-            Squashes these changes into the first parent. May be used multiple times
+            Squashes these changes into the first parent. May be used multiple times to squash
+            multiple ancestors, or once to have the same effect as git's `--amend`
 
     -v, --verbose
             Increase log verbosity. May be used multiple times

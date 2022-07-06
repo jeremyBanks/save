@@ -78,14 +78,14 @@ pub struct Args {
     /// The name to use for the commit's author and committer.
     ///
     /// [default: name from git, or else from parent commit, or else "dev"]
-    #[clap(long = "name")]
+    #[clap(long = "name", env = "GIT_AUTHOR_NAME")]
     pub name: Option<String>,
 
     /// The email to use for the commit's author and committer.
     ///
     /// [default: email from git, or else from parent commit, or else
     /// "dev@localhost"]
-    #[clap(long = "email")]
+    #[clap(long = "email", env = "GIT_AUTHOR_EMAIL")]
     pub email: Option<String>,
 
     /// Prepare the commit, but don't actually update any references in Git.
@@ -97,7 +97,8 @@ pub struct Args {
     pub quiet: i32,
 
     /// Squashes these changes into the first parent. May be used multiple
-    /// times.
+    /// times to squash multiple ancestors, or once to have the same effect
+    /// as git's `--amend`.
     #[clap(long = "squash", parse(from_occurrences), alias = "amend")]
     pub squash: u32,
 
@@ -265,7 +266,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
             );
             previous_name
         } else {
-            let placeholder_name = "save";
+            let placeholder_name = "dev";
             warn!(
                 "No author name found, falling back to placeholder: {:?}",
                 &placeholder_name
@@ -296,7 +297,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
         );
         previous_email
     } else {
-        let placeholder_email = "save";
+        let placeholder_email = "dev@localhost";
         warn!(
             "No author email found, falling back to placeholder: {:?}",
             &placeholder_email

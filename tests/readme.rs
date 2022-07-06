@@ -1,4 +1,4 @@
-use expect_test::expect_file;
+use ::save::testing::assert_at;
 
 #[test]
 fn readme() {
@@ -10,5 +10,5 @@ fn readme() {
     actual.push_str("```\n");
     actual.push_str(&String::from_utf8(output.stdout).unwrap());
     actual.push_str("```\n");
-    expect_file("../README.md").assert_eq(&actual);
+    assert_at("../README.md", &actual);
 }

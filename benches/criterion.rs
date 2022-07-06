@@ -1,10 +1,9 @@
-use {
+use ::{
     criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput},
     eyre::Context,
     git2::{ObjectType, Oid, Repository},
     rand::{RngCore, SeedableRng},
     rand_pcg::Pcg64,
-    rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     save::git2::*,
     std::{path::PathBuf, time::Duration},
 };
@@ -88,34 +87,6 @@ fn bench_hash_git_object(c: &mut Criterion) {
                     for body in bodies.iter() {
                         black_box(Oid::for_object("commit", body));
                     }
-                })
-            },
-        );
-
-        c.bench_with_input(
-            format!("{label} rayon-parallel hash_object (git2)"),
-            &bodies,
-            |b, bodies| {
-                b.iter(|| {
-                    bodies
-                        .par_iter()
-                        .map(|body| {
-                            Oid::hash_object(ObjectType::Commit, body).unwrap();
-                        })
-                        .max()
-                })
-            },
-        );
-
-        c.bench_with_input(
-            format!("{label} rayon-parallel for_object (save)"),
-            &bodies,
-            |b, bodies| {
-                b.iter(|| {
-                    bodies
-                        .par_iter()
-                        .map(|body| Oid::for_object("commit", body))
-                        .max()
                 })
             },
         );

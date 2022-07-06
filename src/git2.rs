@@ -1,15 +1,14 @@
 //! Extending [`::git2`] (`libgit2`).
 
-#[allow(unused)]
-pub(self) use ::git2::{
-    Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
-    Signature, Tag, Time, Tree,
-};
 use {
     crate::zigzag::ZugZug,
     ::{
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
+        git2::{
+            Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote,
+            Repository, Signature, Tag, Time, Tree,
+        },
         itertools::Itertools,
         parking_lot::RwLock,
         petgraph::{
@@ -103,7 +102,7 @@ pub trait RepositoryExt: Borrow<Repository> {
     }
 
     /// Saves all changes in the working directory to this repository using
-    /// insensible defaults.
+    /// sensible defaults.
     ///
     /// # Errors
     ///

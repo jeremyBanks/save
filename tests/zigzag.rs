@@ -1,4 +1,4 @@
-use save::{
+use ::save::{
     testing::{assert_at, assert_debug_eq},
     zigzag::{ZigZag, ZugZug},
 };
