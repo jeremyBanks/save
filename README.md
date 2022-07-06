@@ -1,12 +1,4 @@
-```sh
-$ cargo install save
 ```
-
-```sh
-$ save --help
-```
-
-```text
 save 0.7.0-dev.0
 Would you like to SAVE the change?
 
@@ -20,6 +12,11 @@ OPTIONS:
             Use this commit message, instead of the default.
             
             [default: generated from generation number, tree hash, and parents]
+            
+            [env: SAVE_COMMIT_MESSAGE=]
+
+        --add-parent <ADD_PARENT>
+            Adds another parent to this commit. May be used multiple times
 
     -a, --all
             Commit all files in the repository. This is the default
@@ -33,9 +30,13 @@ OPTIONS:
             The required commit hash or prefix, in hex.
             
             [default: the first four hex digits of the commit's tree hash]
+            
+            [env: SAVE_COMMIT_PREFIX=]
 
     -t, --timestamp <TIMESTAMP>
             Override the system clock timestamp with a custom one
+            
+            [env: SAVE_TIMESTAMP=]
 
     -0, --timeless
             Use the next available timestamp after the previous commit, regardless of the current
@@ -47,6 +48,8 @@ OPTIONS:
             
             This can be used to help produce deterministic timestamps and commit IDs for
             reproducible builds.
+            
+            [env: SAVE_TIMELESS=]
 
         --name <NAME>
             The name to use for the commit's author and committer.
@@ -76,4 +79,5 @@ OPTIONS:
 LINKS:
     https://docs.rs/save/%3C%3D0.7.0-dev.0
     https://crates.io/crates/save
+
 ```

@@ -45,6 +45,10 @@ pub struct Args {
     #[clap(long, short = 'm', env = "SAVE_COMMIT_MESSAGE")]
     pub message: Option<String>,
 
+    /// Adds another parent to this commit. May be used multiple times.
+    #[clap(long = "add-parent")]
+    pub add_parent: Vec<String>,
+
     /// Commit all files in the repository. This is the default.
     #[clap(long = "all", short = 'a', conflicts_with = "empty")]
     pub all: bool,
