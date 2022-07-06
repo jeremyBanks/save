@@ -1,5 +1,5 @@
 ```
-save 0.7.0-dev.0
+save 0.20220707.0
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -55,11 +55,15 @@ OPTIONS:
             The name to use for the commit's author and committer.
             
             [default: name from git, or else from parent commit, or else "dev"]
+            
+            [env: GIT_AUTHOR_NAME=]
 
         --email <EMAIL>
             The email to use for the commit's author and committer.
             
             [default: email from git, or else from parent commit, or else "dev@localhost"]
+            
+            [env: GIT_AUTHOR_EMAIL=]
 
     -n, --dry-run
             Prepare the commit, but don't actually update any references in Git

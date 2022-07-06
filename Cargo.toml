@@ -4,7 +4,7 @@ description = "Would you like to SAVE the change?"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "save"
-version = "0.20220707.0-dev.0"
+version = "0.20220707.0"
 
 [dependencies]
 clap = { features = ["derive", "env", "cargo", "unicode", "wrap_help"], version = "3.2.8" }
@@ -46,8 +46,6 @@ harness = false
 
 [package.metadata.release]
 allow-branch = ["trunk"]
-dev-version = true
-dev-version-ext = "dev"
 post-release-commit-message = "v{{next_version}}"
 pre-release-commit-message = "v{{version}}"
 tag-message = "https://crates.io/crates/{{crate_name}}/{{version}}"

@@ -40,17 +40,17 @@ pub struct Args {
     pub message: Option<String>,
 
     /// Adds another parent to this commit. May be used multiple times.
-    #[clap(long = "add-parent")]
+    #[clap(long, hidden = true)]
     pub add_parent: Vec<String>,
 
     /// Commit all files in the repository. This is the default.
-    #[clap(long = "all", short = 'a', conflicts_with = "empty")]
+    #[clap(long, short = 'a', conflicts_with = "empty")]
     pub all: bool,
 
     /// Don't include any file changes in the commit.
     ///
     /// This commit will have the same tree hash as its parent.
-    #[clap(long = "empty", short = 'e', conflicts_with = "all")]
+    #[clap(long, short = 'e', conflicts_with = "all")]
     pub empty: bool,
 
     /// The required commit hash or prefix, in hex.
@@ -60,7 +60,7 @@ pub struct Args {
     pub prefix_hex: Option<String>,
 
     /// Override the system clock timestamp with a custom one.
-    #[clap(long = "timestamp", short = 't', env = "SAVE_TIMESTAMP")]
+    #[clap(long, short = 't', env = "SAVE_TIMESTAMP", hidden = true)]
     pub timestamp: Option<i64>,
 
     /// Use the next available timestamp after the previous commit, regardless
@@ -72,20 +72,20 @@ pub struct Args {
     ///
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
-    #[clap(long = "timeless", short = '0', env = "SAVE_TIMELESS")]
+    #[clap(long, short = '0', env = "SAVE_TIMELESS", hidden = true)]
     pub timeless: bool,
 
     /// The name to use for the commit's author and committer.
     ///
     /// [default: name from git, or else from parent commit, or else "dev"]
-    #[clap(long = "name", env = "GIT_AUTHOR_NAME")]
+    #[clap(long, env = "GIT_AUTHOR_NAME")]
     pub name: Option<String>,
 
     /// The email to use for the commit's author and committer.
     ///
     /// [default: email from git, or else from parent commit, or else
     /// "dev@localhost"]
-    #[clap(long = "email", env = "GIT_AUTHOR_EMAIL")]
+    #[clap(long, env = "GIT_AUTHOR_EMAIL")]
     pub email: Option<String>,
 
     /// Prepare the commit, but don't actually update any references in Git.
@@ -99,7 +99,7 @@ pub struct Args {
     /// Squashes these changes into the first parent. May be used multiple
     /// times to squash multiple ancestors, or once to have the same effect
     /// as git's `--amend`.
-    #[clap(long = "squash", parse(from_occurrences), alias = "amend")]
+    #[clap(long, parse(from_occurrences), visible_alias = "amend", hidden = true)]
     pub squash: u32,
 
     /// Increase log verbosity. May be used multiple times.
