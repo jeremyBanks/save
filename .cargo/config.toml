@@ -1,2 +1,2 @@
 [env]
-RUSTC_BOOTSTRAP = "1"
+# RUSTC_BOOTSTRAP = "1"

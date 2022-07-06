@@ -1,8 +1,0 @@
-#!/bin/bash
-set -veuo pipefail
-
-cd "$(dirname "$0")/.."
-
-cargo clippy --fix --allow-dirty
-cargo +nightly fmt
-cargo test
