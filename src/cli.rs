@@ -92,10 +92,7 @@ pub struct Args {
     )]
     pub message: Option<String>,
 
-    /// The commit message, but if we're squashing/amending another commit, 
-    ///
-    /// [default: a short string based on the commit's tree hash and ancestry
-    /// graph]
+    /// A prefix to put before the commit message.
     #[clap(
         long,
         help_heading = "COMMIT OPTIONS",
