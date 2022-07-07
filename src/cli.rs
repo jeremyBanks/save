@@ -88,8 +88,7 @@ pub struct Args {
     pub empty: bool,
 
     /// Create the commit even if it contains no changes.
-    #[clap(
-        help_heading = "CONTENT OPTIONS", long, env = "SAVE_ALLOW_EMPTY")]
+    #[clap(help_heading = "CONTENT OPTIONS", long, env = "SAVE_ALLOW_EMPTY")]
     pub allow_empty: bool,
 
     /// The commit message.
@@ -97,8 +96,8 @@ pub struct Args {
     /// [default: a short string based on the commit's tree hash and ancestry
     /// graph]
     #[clap(
-        long,
         help_heading = "COMMIT OPTIONS",
+        long,
         short = 'm',
         env = "SAVE_COMMIT_MESSAGE",
         conflicts_with = "message-prefix"
@@ -109,8 +108,8 @@ pub struct Args {
     /// typically only useful if you're squashing/amending commits with
     /// existing messages you want to add to.
     #[clap(
-        long,
         help_heading = "COMMIT OPTIONS",
+        long,
         short = 'M',
         env = "SAVE_COMMIT_MESSAGE_PREFIX"
     )]
@@ -130,8 +129,8 @@ pub struct Args {
     /// [default: "TTTT", representing the first four hex digits of the commit's
     /// tree hash]
     #[clap(
-        long = "prefix",
         help_heading = "COMMIT OPTIONS",
+        long = "prefix",
         short = 'x',
         env = "SAVE_COMMIT_PREFIX"
     )]
@@ -140,8 +139,8 @@ pub struct Args {
     // SIGNATURE OPTIONS:
     /// Override the system clock timestamp value.
     #[clap(
-        long,
         help_heading = "SIGNATURE OPTIONS",
+        long,
         short = 't',
         env = "SAVE_TIMESTAMP"
     )]
@@ -157,8 +156,8 @@ pub struct Args {
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
     #[clap(
-        long,
         help_heading = "SIGNATURE OPTIONS",
+        long,
         short = '0',
         env = "SAVE_TIMELESS"
     )]
@@ -167,23 +166,29 @@ pub struct Args {
     /// The name and email to use for the commit's author.
     ///
     /// [default: name from git, or else from parent commit, or else "user"]
-    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "SAVE_AUTHOR")]
+    #[clap(
+        help_heading = "SIGNATURE OPTIONS",
+        long,
+        env = "SAVE_AUTHOR"
+    )]
     pub author: Option<String>,
 
     /// The name and email to use for the commit's committer.
     ///
     /// [default: copied from the commit author]
-    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "SAVE_COMMITTER")]
+    #[clap(
+        help_heading = "SIGNATURE OPTIONS",
+        long,
+        env = "SAVE_COMMITTER")]
     pub committer: Option<String>,
 
-    // // // // HISTORY OPTIONS // // // //
     /// What branch head are we updating? Defaults to `"HEAD"` (which also
     /// updates the current branch if one is checked out). Setting it to any
     /// value name will create or force-update that branch without modifying
     /// HEAD or the working directory.
     #[clap(
-        long,
         help_heading = "COMMIT OPTIONS",
+        long,
         env = "SAVE_HEAD",
         conflicts_with = "no-head"
     )]
@@ -194,8 +199,8 @@ pub struct Args {
     /// The commit will be written to the Git database, so it is still possible
     /// for the user to manually add a reference to it.
     #[clap(
-        long,
         help_heading = "COMMIT OPTIONS",
+        long,
         short = 'n',
         visible_alias = "dry-run",
         conflicts_with = "head"
@@ -204,20 +209,20 @@ pub struct Args {
 
     /// Adds another parent to the new commit. May be repeated to add multiple
     /// parents, though duplicated parents will are ignored.
-    #[clap(long = "add-parent", help_heading = "HISTORY OPTIONS", short = 'p')]
+    #[clap(help_heading = "HISTORY OPTIONS", long = "add-parent", short = 'p')]
     pub added_parent_ref: Vec<String>,
 
     /// Removes a parent from the new commit. May be repeated to remove multiple
     /// parents. If the parent is not present, this will fail with an error.
-    #[clap(long = "remove-parent", help_heading = "HISTORY OPTIONS")]
+    #[clap(help_heading = "HISTORY OPTIONS", long = "remove-parent")]
     pub removed_parent_ref: Vec<String>,
 
     /// Squashes these changes into the first parent. May be repeated multiple
     /// times to squash multiple generations. Authors of squashed commits will
     /// be added using the Co-Authored-By header.
     #[clap(
-        long,
         help_heading = "HISTORY OPTIONS",
+        long,
         short = 'u',
         parse(from_occurrences),
         visible_alias = "amend",
@@ -231,8 +236,8 @@ pub struct Args {
     ///
     /// This will fail if the specified commit isn't actually an ancestor.
     #[clap(
-        long = "squash-tail",
         help_heading = "HISTORY OPTIONS",
+        long = "squash-tail",
         conflicts_with = "squash"
     )]
     pub squash_tail_ref: Vec<String>,
