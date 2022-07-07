@@ -62,10 +62,23 @@ COMMIT OPTIONS:
             
             [env: SAVE_COMMIT_MESSAGE=]
 
-    -x, --prefix <PREFIX_HEX>
-            The required commit ID hash or prefix, in hex.
+    -M, --message-prefix <MESSAGE_PREFIX>
+            A prefix to put on its own line before the commit message. This is typically only useful
+            if you're squashing/amending commits with existing messages you want to add to
             
-            [default: the first four hex digits of the commit's tree hash]
+            [env: SAVE_COMMIT_MESSAGE_PREFIX=]
+
+    -x, --prefix <PREFIX_HEX>
+            The required commit ID hash or prefix, in hex. This will be brute-forced.
+            
+            This supports some non-hex values with special meanings:
+            
+            - `_` underscore skips a character whose value we don't care about. - 'T' is replaced
+            with the next nibble of the tree hash. - 'R' is replaced with the last digits of the
+            revision index. - 'G' is replaced with the last digits of the generation index. - 'N' is
+            replaced with the last digits of the commit index.
+            
+            [default: "TTTT", representing the first four hex digits of the commit's tree hash]
             
             [env: SAVE_COMMIT_PREFIX=]
 
@@ -138,6 +151,12 @@ HISTORY OPTIONS:
             
             This will fail if the specified commit isn't actually an ancestor.
 
+        --squash-after-head <SQUASH_AFTER_HEAD_REF>
+            Squashes every ancestor commit that isn't part included in the target head(s).
+            
+            For example, this can be used to squash all changes in a branch by excluding the
+            upstream branch.
+
         --retcon-tail <RETCON_TAIL_REF>
             Rewrites the timestamps and authorship information of all commits up to the given
             ancestors based on the current settings.
@@ -145,7 +164,7 @@ HISTORY OPTIONS:
             Commit messages will only be replaced if they match our generated message pattern, or
             are empty.
 
-        --retcon-exclude-head <RETCON_EXCLUDE_HEAD_REF>
+        --retcon-after-head <RETCON_AFTER_HEAD_REF>
             Retcons every ancestor commit that isn't part included in the target head(s).
             
             For example, this can be used to retcon all changes in a branch by excluding the
@@ -153,7 +172,7 @@ HISTORY OPTIONS:
 
         --retcon-all
             Retcons the entire history. You probably don't want to use this, but if you do use it
-            consistently it should only affect the most recent commit anyway
+            consistently it should only affect the most recent commit
 
 LINKS:
     https://docs.rs/save/0.20220708.0
