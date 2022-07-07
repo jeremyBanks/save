@@ -32,7 +32,7 @@ const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
     infer_long_args = true,
     setting = AppSettings::DeriveDisplayOrder,
     version = V_VERSION,
-    next_help_heading = "GENERAL OPTIONS:"
+    next_help_heading = "GENERAL OPTIONS"
 )]
 #[non_exhaustive]
 pub struct Args {

@@ -16,17 +16,18 @@ USAGE:
     save [OPTIONS]
 
 OPTIONS:
-    -q, --quiet
-            Decrease log verbosity. May be repeated to decrease verbosity further
-
-    -v, --verbose
-            Increase log verbosity. May be repeated to increase verbosity further
-
     -h, --help
             Print help information
 
     -V, --version
             Print version information
+
+GENERAL OPTIONS::
+    -q, --quiet
+            Decrease log verbosity. May be repeated to decrease verbosity further
+
+    -v, --verbose
+            Increase log verbosity. May be repeated to increase verbosity further
 
 COMMIT OPTIONS:
     -m, --message <MESSAGE>
