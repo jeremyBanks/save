@@ -35,7 +35,6 @@ const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 )]
 #[non_exhaustive]
 pub struct Args {
-    // GENERAL OPTIONS:
     /// Decrease log verbosity. May be repeated to decrease verbosity further.
     #[clap(long, short = 'q', parse(from_occurrences))]
     pub quiet: i32,
@@ -44,15 +43,14 @@ pub struct Args {
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
 
-    // CONTENT OPTIONS:
-    // //
-    // //
-    // //
     /// Commit all files in the repository. This is the default.
     ///
     /// The commit will fail if there are no changes, unless `--allow-empty` is
     /// set.
-    #[clap(long, help_heading="CONTENT OPTIONS", short = 'a', conflicts_with_all = &["staged", "tree", "empty"])]
+    #[clap(
+        help_heading="CONTENT OPTIONS",
+        long, short = 'a', conflicts_with_all = &["staged", "tree", "empty"]
+    )]
     pub all: bool,
 
     /// Commit only files that have been explicitly staged with `git add`.
@@ -78,7 +76,6 @@ pub struct Args {
     #[clap(long, help_heading = "CONTENT OPTIONS", env = "SAVE_ALLOW_EMPTY")]
     pub allow_empty: bool,
 
-    // COMMIT OPTIONS:
     /// The commit message.
     ///
     /// [default: a short string based on the commit's tree hash and ancestry
