@@ -14,17 +14,18 @@ use {
     },
 };
 
+const CARGO_PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
+const CARGO_PKG_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 /// Would you like to SAVE the change?
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone)]
 #[clap(
     after_help = {
-        static AFTER_HELP: Lazy<String> = Lazy::new(|| format!(
-            "LINKS:\n    https://docs.rs/{name}/{version}\n    https://crates.io/crates/{name}/{version}",
-            name = env!("CARGO_PKG_NAME"),
-            version = env!("CARGO_PKG_VERSION"),
-        ));
+        static AFTER_HELP: Lazy<String> = Lazy::new(|| format!("LINKS:
+    https://docs.rs/{CARGO_PKG_NAME}/{CARGO_PKG_VERSION}
+    https://crates.io/crates/{CARGO_PKG_NAME}/{CARGO_PKG_VERSION}"));
         AFTER_HELP.as_ref()
     },
     dont_collapse_args_in_usage = true,
@@ -167,7 +168,7 @@ pub fn main(args: Args) -> Result<()> {
         if tree == head.tree_id() {
             if args.message.is_some() {
                 info!("Committing with only a message.");
-            } else if args.empty {
+            } else if args.empty || args.allow_empty {
                 info!("Committing with no changes.");
             } else {
                 warn!("Nothing to commit. Use --empty or --allow-empty if this is intentional.");
@@ -277,6 +278,8 @@ pub fn main(args: Args) -> Result<()> {
 /// Determine the Git user name and email to use.
 #[instrument(level = "debug", skip(repo))]
 fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
+    // TODO: move this to git2.rs, right?
+
     let config = repo.config()?;
 
     let user_name: String = {

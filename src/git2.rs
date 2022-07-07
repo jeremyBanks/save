@@ -459,7 +459,10 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                                     body: candidate_body,
                                     oid: candidate_oid,
                                 });
-                                trace!("Ending {thread_index} with a new best: {index}");
+                                trace!(
+                                    "Ending thread {thread_index} with a new best hit index: \
+                                     {index}"
+                                );
                             } else {
                                 let best_index = best.as_ref().unwrap().index;
                                 trace!(
