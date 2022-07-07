@@ -33,6 +33,7 @@ const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
     setting = AppSettings::DeriveDisplayOrder,
     version = V_VERSION,
 )]
+#[non_exhaustive]
 pub struct Args {
     // OPTIONS:
     /// Decrease log verbosity. May be repeated to decrease verbosity further.
@@ -234,7 +235,9 @@ impl Args {
 pub fn main(args: Args) -> Result<()> {
     let repo = open_or_init_repo(&args)?;
 
-    let args = Args::build(|args| {});
+    let args = Args {
+        ..Args::default()
+    };
 
     // TODO: move most of the following to RepositoryExt::Save
 
