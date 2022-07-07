@@ -1,12 +1,3 @@
-```sh
-$ cargo install save --version 0.20220708.0
-```
-
-```sh
-$ save --help
-```
-
-```text
 save v0.20220708.0
 
 ╔══════════════════╗
@@ -197,4 +188,3 @@ HISTORY OPTIONS:
 LINKS:
     https://docs.rs/save/0.20220708.0
     https://crates.io/crates/save/0.20220708.0
-```

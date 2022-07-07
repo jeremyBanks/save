@@ -1,0 +1,93 @@
+save v0.20220708.0
+Commit everything in the current Git repository -- no questions asked.
+
+USAGE:
+    save [OPTIONS]
+
+OPTIONS:
+    -q, --quiet      Decrease log verbosity. May be repeated to decrease verbosity further
+    -v, --verbose    Increase log verbosity. May be repeated to increase verbosity further
+    -h, --help       Print help information
+    -V, --version    Print version information
+
+CONTENT OPTIONS:
+    -a, --all            Commit all files in the repository. This is the default
+    -s, --staged         Commit only files that have been explicitly staged with `git add`
+        --tree <TREE>    Include the specified tree object in the commit, without looking at or
+                         modifying the index or working tree
+    -e, --empty          Don't include any file changes in the commit
+        --allow-empty    Create the commit even if it contains no changes [env: SAVE_ALLOW_EMPTY=]
+
+COMMIT OPTIONS:
+    -m, --message <MESSAGE>
+            The commit message [env: SAVE_COMMIT_MESSAGE=]
+
+    -M, --message-prefix <MESSAGE_PREFIX>
+            A prefix to put on its own line before the commit message. This is typically only useful
+            if you're squashing/amending commits with existing messages you want to add to [env:
+            SAVE_COMMIT_MESSAGE_PREFIX=]
+
+    -x, --prefix <PREFIX_HEX>
+            The required commit ID hash or prefix, in hex. This will be brute-forced [env:
+            SAVE_COMMIT_PREFIX=]
+
+        --head <HEAD>
+            What branch head are we updating? Defaults to `"HEAD"` (which also updates the current
+            branch if one is checked out). Setting it to any value name will create or force-update
+            that branch without modifying HEAD or the working directory [env: SAVE_HEAD=]
+
+    -n, --no-head
+            Prepare the commit, but don't actually update any references in Git [env: SAVE_NO_HEAD=]
+            [aliases: dry-run]
+
+SIGNATURE OPTIONS:
+    -t, --timestamp <TIMESTAMP>    Override the system clock timestamp value [env: SAVE_TIMESTAMP=]
+    -0, --timeless                 Use the next available timestamp after the parent commit's
+                                   timestamps, regardless of the actual current clock time. Assuming
+                                   there is a parent commit, this is equivalent to `--timestamp=0`.
+                                   If we're creating an initial commit (with no parents), this uses
+                                   the next available timestamp after the current time (or value
+                                   provided to `--timestamp`) rounded down to the closest multiple
+                                   of `0x1000000` (a period of ~6 months) [env: SAVE_TIMELESS=]
+        --author <AUTHOR>          The name and email to use for the commit's author [env:
+                                   SAVE_AUTHOR=]
+        --committer <COMMITTER>    The name and email to use for the commit's committer [env:
+                                   SAVE_COMMITTER=]
+
+HISTORY OPTIONS:
+    -p, --add-parent <ADDED_PARENT_REF>
+            Adds another parent to the new commit. May be repeated to add multiple parents, though
+            duplicated parents will are ignored [env: SAVE_ADD_PARENT=]
+
+        --remove-parent <REMOVED_PARENT_REF>
+            Removes a parent from the new commit. May be repeated to remove multiple parents. If the
+            parent is not present, this will fail with an error [env: SAVE_REMOVE_PARENTS=]
+
+    -u, --squash
+            Squashes these changes into the first parent. May be repeated multiple times to squash
+            multiple generations. Authors of squashed commits will be added using the Co-Authored-By
+            header [env: SAVE_SQUASH_COUNT=] [aliases: amend]
+
+        --squash-tail <SQUASH_TAIL_REF>
+            Squashes all changes from this commit up to the specified ancestor commit(s). Authors of
+            squashed commits will be added using the Co-Authored-By header [env: SAVE_SQUASH_TAIL=]
+
+        --squash-after-head <SQUASH_AFTER_HEAD_REF>
+            Squashes every ancestor commit that isn't part included in the target head(s) [env:
+            SAVE_SQUASH_AFTER_HEAD=]
+
+        --retcon-tail <RETCON_TAIL_REF>
+            Rewrites the timestamps and authorship information of all commits up to the given
+            ancestors based on the current settings [env: SAVE_RETCON_TAIL=]
+
+        --retcon-after-head <RETCON_AFTER_HEAD_REF>
+            Retcons every ancestor commit that isn't part included in the target head(s) [env:
+            SAVE_RETCON_AFTER_HEAD=]
+
+        --retcon-all
+            Retcons the entire history. You probably don't want to use this, but if you do use it
+            consistently it should only affect the most recent commit [env: SAVE_RETCON_ALL=]
+
+LINKS:
+    https://docs.rs/save/0.20220708.0
+    https://crates.io/crates/save/0.20220708.0
