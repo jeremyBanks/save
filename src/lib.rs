@@ -58,7 +58,11 @@
 )]
 
 pub mod cli;
+#[doc(hidden)]
+pub mod ez;
 pub mod git_ext;
 pub mod hex;
 pub mod testing;
 pub mod zigzag;
+#[doc(inline)]
+pub use ez::*;
