@@ -254,14 +254,20 @@ pub struct Args {
     /// For example, this can be used to retcon all changes in a branch by
     /// excluding the upstream branch.
     #[clap(
-        long = "retcon-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"]
-)]
+        long = "retcon-after-head",
+        help_heading = "HISTORY OPTIONS",
+        conflicts_with_all = &["retcon-tail-ref", "retcon-all"]
+    )]
     pub retcon_after_head_ref: Vec<String>,
 
     /// Retcons the entire history. You probably don't want to use this,
     /// but if you do use it consistently it should only affect the most
     /// recent commit.
-    #[clap(long, help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"])]
+    #[clap(
+        long,
+        help_heading = "HISTORY OPTIONS",
+        conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"]
+    )]
     pub retcon_all: bool,
 }
 
