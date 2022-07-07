@@ -49,7 +49,9 @@ pub struct Args {
     /// set.
     #[clap(
         help_heading="CONTENT OPTIONS",
-        long, short = 'a', conflicts_with_all = &["staged", "tree", "empty"]
+        long,
+        short = 'a',
+        conflicts_with_all = &["staged", "tree", "empty"]
     )]
     pub all: bool,
 
