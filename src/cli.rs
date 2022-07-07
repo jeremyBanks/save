@@ -230,7 +230,9 @@ pub struct Args {
     /// For example, this can be used to squash all changes in a branch by
     /// excluding the upstream branch.
     #[clap(
-        long = "squash-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["squash-tail-ref", "retcon-all"]
+        long = "squash-after-head",
+        help_heading = "HISTORY OPTIONS",
+        conflicts_with_all = &["squash-tail-ref", "retcon-all"]
     )]
     pub squash_after_head_ref: Vec<String>,
 
@@ -240,7 +242,9 @@ pub struct Args {
     /// Commit messages will only be replaced if they match our generated
     /// message pattern, or are empty.
     #[clap(
-        long = "retcon-tail", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-after-head-ref", "retcon-all"]
+        long = "retcon-tail",
+        help_heading = "HISTORY OPTIONS",
+        conflicts_with_all = &["retcon-after-head-ref", "retcon-all"]
     )]
     pub retcon_tail_ref: Vec<String>,
 
@@ -249,7 +253,8 @@ pub struct Args {
     ///
     /// For example, this can be used to retcon all changes in a branch by
     /// excluding the upstream branch.
-    #[clap(long = "retcon-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"]
+    #[clap(
+        long = "retcon-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"]
 )]
     pub retcon_after_head_ref: Vec<String>,
 
