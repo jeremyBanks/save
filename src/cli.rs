@@ -109,8 +109,8 @@ pub struct Args {
     ///
     /// - `_` underscore skips a character whose value we don't care about.
     /// - 'T' represents the next nibble of the tree hash.
-    /// - 'R' represents the last digits of the revision number.
-    /// - 
+    /// - 'R' is replaced with the last digits of the 
+    /// -
     ///
     /// [default: the first four hex digits of the commit's tree hash]
     #[clap(
