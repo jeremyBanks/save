@@ -201,12 +201,20 @@ pub struct Args {
     )]
     pub squash_tail_ref: Vec<String>,
 
+    /// Squashes every ancestor commit that isn't part included in the target
+    /// head(s).
+    ///
+    /// For example, this can be used to squash all changes in a branch by
+    /// excluding the upstream branch.
+    #[clap(long = "squash-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["squash-tail-ref", "retcon-all"])]
+    pub squash_after_head_ref: Vec<String>,
+
     /// Rewrites the timestamps and authorship information of all commits up to
     /// the given ancestors based on the current settings.
     ///
     /// Commit messages will only be replaced if they match our generated
     /// message pattern, or are empty.
-    #[clap(long = "retcon-tail", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-exclude-head-ref", "retcon-all"])]
+    #[clap(long = "retcon-tail", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-after-head-ref", "retcon-all"])]
     pub retcon_tail_ref: Vec<String>,
 
     /// Retcons every ancestor commit that isn't part included in the target
@@ -214,12 +222,12 @@ pub struct Args {
     ///
     /// For example, this can be used to retcon all changes in a branch by
     /// excluding the upstream branch.
-    #[clap(long = "retcon-exclude-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"])]
-    pub retcon_exclude_head_ref: Vec<String>,
+    #[clap(long = "retcon-after-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"])]
+    pub retcon_after_head_ref: Vec<String>,
 
     /// Retcons the entire history. You probably don't want to use this,
     /// but if you do use it consistently it should only affect the most
-    /// recent commit anyway.
+    /// recent commit.
     #[clap(long, help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-exclude-head-ref"])]
     pub retcon_all: bool,
 }
