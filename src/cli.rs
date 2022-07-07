@@ -223,7 +223,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn build<F: FnOnce(&mut Self) -> T, T>(f: F) -> Self {
+    pub fn with<F: FnOnce(&mut Self) -> T, T>(f: F) -> Self {
         let mut args = Self::default();
         f(&mut args);
         args
@@ -235,7 +235,9 @@ impl Args {
 pub fn main(args: Args) -> Result<()> {
     let repo = open_or_init_repo(&args)?;
 
-    let args = Args { ..Args::default() };
+    let args = Args::with(|args| {
+        args.retcon_all = true;
+    });
 
     // TODO: move most of the following to RepositoryExt::Save
 
