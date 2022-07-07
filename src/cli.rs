@@ -92,7 +92,7 @@ pub struct Args {
     )]
     pub message: Option<String>,
 
-    /// A prefix to put before the commit message.
+    /// A prefix to put on its own line before the commit message. This is typically only
     #[clap(
         long,
         help_heading = "COMMIT OPTIONS",
