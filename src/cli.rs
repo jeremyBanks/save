@@ -48,7 +48,7 @@ pub struct Args {
     /// The commit will fail if there are no changes, unless `--allow-empty` is
     /// set.
     #[clap(
-        help_heading="CONTENT OPTIONS",
+        help_heading = "CONTENT OPTIONS",
         long,
         short = 'a',
         conflicts_with_all = &["staged", "tree", "empty"]
@@ -166,20 +166,13 @@ pub struct Args {
     /// The name and email to use for the commit's author.
     ///
     /// [default: name from git, or else from parent commit, or else "user"]
-    #[clap(
-        help_heading = "SIGNATURE OPTIONS",
-        long,
-        env = "SAVE_AUTHOR"
-    )]
+    #[clap(help_heading = "SIGNATURE OPTIONS", long, env = "SAVE_AUTHOR")]
     pub author: Option<String>,
 
     /// The name and email to use for the commit's committer.
     ///
     /// [default: copied from the commit author]
-    #[clap(
-        help_heading = "SIGNATURE OPTIONS",
-        long,
-        env = "SAVE_COMMITTER")]
+    #[clap(help_heading = "SIGNATURE OPTIONS", long, env = "SAVE_COMMITTER")]
     pub committer: Option<String>,
 
     /// What branch head are we updating? Defaults to `"HEAD"` (which also
