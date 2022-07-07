@@ -1,4 +1,4 @@
-use ::{git2::Repository, save::git_ext::RepositoryExt};
+use ::{git2::Repository, save::git2::RepositoryExt};
 
 #[test]
 fn cli() {

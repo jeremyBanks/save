@@ -1,7 +1,7 @@
 //! The CLI.
 
 use {
-    crate::git_ext::*,
+    crate::git2::*,
     ::{
         clap::{AppSettings, Parser},
         eyre::{bail, Result},
