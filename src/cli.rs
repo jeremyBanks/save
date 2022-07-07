@@ -32,10 +32,11 @@ const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
     infer_long_args = true,
     setting = AppSettings::DeriveDisplayOrder,
     version = V_VERSION,
+    next_help_heading = "GENERAL OPTIONS:"
 )]
 #[non_exhaustive]
 pub struct Args {
-    // OPTIONS:
+    // GENERAL OPTIONS:
     /// Decrease log verbosity. May be repeated to decrease verbosity further.
     #[clap(long, short = 'q', parse(from_occurrences))]
     pub quiet: i32,
