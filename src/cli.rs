@@ -45,6 +45,9 @@ pub struct Args {
     pub verbose: i32,
 
     // CONTENT OPTIONS:
+    // //
+    // //
+    // //
     /// Commit all files in the repository. This is the default.
     ///
     /// The commit will fail if there are no changes, unless `--allow-empty` is
