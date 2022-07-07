@@ -251,7 +251,7 @@ pub struct Args {
     /// Retcons the entire history. You probably don't want to use this,
     /// but if you do use it consistently it should only affect the most
     /// recent commit.
-    #[clap(long, help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-exclude-head-ref"])]
+    #[clap(long, help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"])]
     pub retcon_all: bool,
 }
 
