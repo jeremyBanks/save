@@ -16,12 +16,6 @@ USAGE:
     save [OPTIONS]
 
 OPTIONS:
-    -n, --dry-run
-            Prepare the commit, but don't actually update any references in Git.
-            
-            The commit will be written to the Git database, so it is still possible for the user to
-            manually add a reference to it.
-
     -q, --quiet
             Decrease log verbosity. May be repeated to decrease verbosity further
 
@@ -43,13 +37,28 @@ COMMIT OPTIONS:
             [env: SAVE_COMMIT_MESSAGE=]
 
     -x, --prefix <PREFIX_HEX>
-            The required commit hash or prefix, in hex.
+            The required commit ID hash or prefix, in hex.
             
             [default: the first four hex digits of the commit's tree hash]
             
             [env: SAVE_COMMIT_PREFIX=]
 
-TREE OPTIONS:
+        --head <HEAD>
+            What branch head are we updating? Defaults to `"HEAD"` (which also updates the current
+            branch if one is checked out). Setting it to any value name will create or force-update
+            that branch without modifying HEAD or the working directory
+            
+            [env: SAVE_HEAD=]
+
+    -n, --no-head
+            Prepare the commit, but don't actually update any references in Git.
+            
+            The commit will be written to the Git database, so it is still possible for the user to
+            manually add a reference to it.
+            
+            [aliases: dry-run]
+
+CONTENT OPTIONS:
     -a, --all
             Commit all files in the repository. This is the default.
             
@@ -72,6 +81,8 @@ TREE OPTIONS:
 
         --allow-empty
             Create the commit even if it contains no changes
+            
+            [env: SAVE_ALLOW_EMPTY=]
 
 SIGNATURE OPTIONS:
     -t, --timestamp <TIMESTAMP>
@@ -91,33 +102,22 @@ SIGNATURE OPTIONS:
             
             [env: SAVE_TIMELESS=]
 
-        --name <NAME>
-            The name to use for the commit's author and committer.
+        --author <AUTHOR>
+            The name and email to use for the commit's author.
             
             [default: name from git, or else from parent commit, or else "user"]
             
-            [env: GIT_AUTHOR_NAME=]
+            [env: SAVE_AUTHOR=]
 
-        --email <EMAIL>
-            The email to use for the commit's author and committer.
+        --committer <COMMITTER>
+            The name and email to use for the commit's committer.
             
-            [default: email from git, or else from parent commit, or else "user@localhost"]
+            [default: copied from the commit author]
             
-            [env: GIT_AUTHOR_EMAIL=]
+            [env: SAVE_COMMITTER=]
 
-GRAPH OPTIONS:
-    -u, --squash
-            Squashes these changes into the first parent. May be repeated multiple times to squash
-            multiple generations
-            
-            [aliases: amend]
-
-        --squash-to <SQUASH_TO_REF>
-            Squashes all changes from this commit up to the specified ancestor commit.
-            
-            This will fail if the specified commit isn't actually an ancestor.
-
-    -p, --add-parent <PARENT_REF>
+HISTORY OPTIONS:
+    -p, --add-parent <ADDED_PARENT_REF>
             Adds another parent to the new commit. May be repeated to add multiple parents, though
             duplicated parents will are ignored
 
@@ -125,7 +125,37 @@ GRAPH OPTIONS:
             Removes a parent from the new commit. May be repeated to remove multiple parents. If the
             parent is not present, this will fail with an error
 
+    -u, --squash
+            Squashes these changes into the first parent. May be repeated multiple times to squash
+            multiple generations. Authors of squashed commits will be added using the Co-Authored-By
+            header
+            
+            [aliases: amend]
+
+        --squash-tail <SQUASH_TAIL_REF>
+            Squashes all changes from this commit up to the specified ancestor commit(s). Authors of
+            squashed commits will be added using the Co-Authored-By header.
+            
+            This will fail if the specified commit isn't actually an ancestor.
+
+        --retcon-tail <RETCON_TAIL_REF>
+            Rewrites the timestamps and authorship information of all commits up to the given
+            ancestors based on the current settings.
+            
+            Commit messages will only be replaced if they match our generated message pattern, or
+            are empty.
+
+        --retcon-exclude-head <RETCON_EXCLUDE_HEAD_REF>
+            Retcons every ancestor commit that isn't part included in the target head(s).
+            
+            For example, this can be used to retcon all changes in a branch by excluding the
+            upstream branch.
+
+        --retcon-all
+            Retcons the entire history. You probably don't want to use this, but if you do use it
+            consistently it should only affect the most recent commit anyway
+
 LINKS:
-    https://docs.rs/save/v0.20220708.0
-    https://crates.io/crates/save/v0.20220708.0
+    https://docs.rs/save/0.20220708.0
+    https://crates.io/crates/save/0.20220708.0
 ```

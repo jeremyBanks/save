@@ -14,12 +14,13 @@ use {
     },
 };
 
-const VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// Would you like to SAVE the change?
 ///
 /// Commit everything in the current Git repository, no questions asked.
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[clap(
     after_help = {
         static AFTER_HELP: Lazy<String> = Lazy::new(|| format!("LINKS:
@@ -30,9 +31,19 @@ const VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
     dont_collapse_args_in_usage = true,
     infer_long_args = true,
     setting = AppSettings::DeriveDisplayOrder,
-    version = VERSION,
+    version = V_VERSION,
 )]
 pub struct Args {
+    // OPTIONS:
+    /// Decrease log verbosity. May be repeated to decrease verbosity further.
+    #[clap(long, short = 'q', parse(from_occurrences))]
+    pub quiet: i32,
+
+    /// Increase log verbosity. May be repeated to increase verbosity further.
+    #[clap(long, short = 'v', parse(from_occurrences))]
+    pub verbose: i32,
+
+    // COMMIT OPTIONS:
     /// The commit message.
     ///
     /// [default: a short string based on the commit's tree hash and ancestry
@@ -49,7 +60,7 @@ pub struct Args {
     ///
     /// The commit will fail if there are no changes, unless `--allow-empty` is
     /// set.
-    #[clap(long, help_heading="TREE OPTIONS", short = 'a', conflicts_with_all = &["staged", "tree", "empty"])]
+    #[clap(long, help_heading="CONTENT OPTIONS", short = 'a', conflicts_with_all = &["staged", "tree", "empty"])]
     pub all: bool,
 
     /// Commit only files that have been explicitly staged with `git add`.
@@ -57,32 +68,10 @@ pub struct Args {
     /// This is like the default behaviour of `git commit`.
     /// The commit will fail if there are no staged changes unless
     /// `--allow-empty` is set.
-    #[clap(long, help_heading="TREE OPTIONS", short = 's', conflicts_with_all = &["all", "tree", "empty"])]
+    #[clap(long, help_heading="CONTENT OPTIONS", short = 's', conflicts_with_all = &["all", "tree", "empty"])]
     pub staged: bool,
 
-    /// Include the specified tree object in the commit, without looking at or
-    /// modifying the index or working tree.
-    #[clap(long, help_heading="TREE OPTIONS", conflicts_with_all = &["all", "staged", "empty"])]
-    pub tree: Option<String>,
-
-    /// Don't include any file changes in the commit.
-    ///
-    /// This commit will have the same tree hash as its parent.
-    #[clap(long, help_heading="TREE OPTIONS", short = 'e', conflicts_with_all = &["all", "staged", "tree"])]
-    pub empty: bool,
-
-    /// Create the commit even if it contains no changes.
-    #[clap(long, help_heading = "TREE OPTIONS")]
-    pub allow_empty: bool,
-
-    /// Prepare the commit, but don't actually update any references in Git.
-    ///
-    /// The commit will be written to the Git database, so it is still possible
-    /// for the user to manually add a reference to it.
-    #[clap(long, short = 'n')]
-    pub dry_run: bool,
-
-    /// The required commit hash or prefix, in hex.
+    /// The required commit ID hash or prefix, in hex.
     ///
     /// [default: the first four hex digits of the commit's tree hash]
     #[clap(
@@ -93,6 +82,23 @@ pub struct Args {
     )]
     pub prefix_hex: Option<String>,
 
+    // CONTENT OPTIONS:
+    /// Include the specified tree object in the commit, without looking at or
+    /// modifying the index or working tree.
+    #[clap(long, help_heading="CONTENT OPTIONS", conflicts_with_all = &["all", "staged", "empty"])]
+    pub tree: Option<String>,
+
+    /// Don't include any file changes in the commit.
+    ///
+    /// This commit will have the same tree hash as its parent.
+    #[clap(long, help_heading="CONTENT OPTIONS", short = 'e', conflicts_with_all = &["all", "staged", "tree"])]
+    pub empty: bool,
+
+    /// Create the commit even if it contains no changes.
+    #[clap(long, help_heading = "CONTENT OPTIONS", env = "SAVE_ALLOW_EMPTY")]
+    pub allow_empty: bool,
+
+    // SIGNATURE OPTIONS:
     /// Override the system clock timestamp value.
     #[clap(
         long,
@@ -119,73 +125,118 @@ pub struct Args {
     )]
     pub timeless: bool,
 
-    /// The name to use for the commit's author and committer.
+    /// The name and email to use for the commit's author.
     ///
     /// [default: name from git, or else from parent commit, or else "user"]
-    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "GIT_AUTHOR_NAME")]
-    pub name: Option<String>,
+    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "SAVE_AUTHOR")]
+    pub author: Option<String>,
 
-    /// The email to use for the commit's author and committer.
+    /// The name and email to use for the commit's committer.
     ///
-    /// [default: email from git, or else from parent commit, or else
-    /// "user@localhost"]
-    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "GIT_AUTHOR_EMAIL")]
-    pub email: Option<String>,
+    /// [default: copied from the commit author]
+    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "SAVE_COMMITTER")]
+    pub committer: Option<String>,
 
-    /// Squashes these changes into the first parent. May be repeated multiple
-    /// times to squash multiple generations.
+    // // // // HISTORY OPTIONS // // // //
+    /// What branch head are we updating? Defaults to `"HEAD"` (which also
+    /// updates the current branch if one is checked out). Setting it to any
+    /// value name will create or force-update that branch without modifying
+    /// HEAD or the working directory.
     #[clap(
         long,
-        help_heading = "GRAPH OPTIONS",
+        help_heading = "COMMIT OPTIONS",
+        env = "SAVE_HEAD",
+        conflicts_with = "no-head"
+    )]
+    pub head: Option<i64>,
+
+    /// Prepare the commit, but don't actually update any references in Git.
+    ///
+    /// The commit will be written to the Git database, so it is still possible
+    /// for the user to manually add a reference to it.
+    #[clap(
+        long,
+        help_heading = "COMMIT OPTIONS",
+        short = 'n',
+        visible_alias = "dry-run",
+        conflicts_with = "head"
+    )]
+    pub no_head: bool,
+
+    /// Adds another parent to the new commit. May be repeated to add multiple
+    /// parents, though duplicated parents will are ignored.
+    #[clap(long = "add-parent", help_heading = "HISTORY OPTIONS", short = 'p')]
+    pub added_parent_ref: Vec<String>,
+
+    /// Removes a parent from the new commit. May be repeated to remove multiple
+    /// parents. If the parent is not present, this will fail with an error.
+    #[clap(long = "remove-parent", help_heading = "HISTORY OPTIONS")]
+    pub removed_parent_ref: Vec<String>,
+
+    /// Squashes these changes into the first parent. May be repeated multiple
+    /// times to squash multiple generations. Authors of squashed commits will
+    /// be added using the Co-Authored-By header.
+    #[clap(
+        long,
+        help_heading = "HISTORY OPTIONS",
         short = 'u',
         parse(from_occurrences),
         visible_alias = "amend",
-        conflicts_with = "squash-to-ref"
+        conflicts_with = "squash-tail-ref"
     )]
     pub squash: u32,
 
     /// Squashes all changes from this commit up to the specified ancestor
-    /// commit.
+    /// commit(s). Authors of squashed commits will be added using the
+    /// Co-Authored-By header.
     ///
     /// This will fail if the specified commit isn't actually an ancestor.
     #[clap(
-        long = "squash-to",
-        help_heading = "GRAPH OPTIONS",
+        long = "squash-tail",
+        help_heading = "HISTORY OPTIONS",
         conflicts_with = "squash"
     )]
-    pub squash_to_ref: Option<String>,
+    pub squash_tail_ref: Vec<String>,
 
-    /// Adds another parent to the new commit. May be repeated to add multiple
-    /// parents, though duplicated parents will are ignored.
-    #[clap(long = "add-parent", help_heading = "GRAPH OPTIONS", short = 'p')]
-    pub parent_ref: Vec<String>,
+    /// Rewrites the timestamps and authorship information of all commits up to
+    /// the given ancestors based on the current settings.
+    ///
+    /// Commit messages will only be replaced if they match our generated
+    /// message pattern, or are empty.
+    #[clap(long = "retcon-tail", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-exclude-head-ref", "retcon-all"])]
+    pub retcon_tail_ref: Vec<String>,
 
-    /// Removes a parent from the new commit. May be repeated to remove multiple
-    /// parents. If the parent is not present, this will fail with an error.
-    #[clap(long = "remove-parent", help_heading = "GRAPH OPTIONS")]
-    pub removed_parent_ref: Vec<String>,
+    /// Retcons every ancestor commit that isn't part included in the target
+    /// head(s).
+    ///
+    /// For example, this can be used to retcon all changes in a branch by
+    /// excluding the upstream branch.
+    #[clap(long = "retcon-exclude-head", help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-all"])]
+    pub retcon_exclude_head_ref: Vec<String>,
 
-    /// Decrease log verbosity. May be repeated to decrease verbosity further.
-    #[clap(long, short = 'q', parse(from_occurrences))]
-    pub quiet: i32,
+    /// Retcons the entire history. You probably don't want to use this,
+    /// but if you do use it consistently it should only affect the most
+    /// recent commit anyway.
+    #[clap(long, help_heading = "HISTORY OPTIONS", conflicts_with_all = &["retcon-tail-ref", "retcon-exclude-head-ref"])]
+    pub retcon_all: bool,
+}
 
-    /// Increase log verbosity. May be repeated to increase verbosity further.
-    #[clap(long, short = 'v', parse(from_occurrences))]
-    pub verbose: i32,
+impl Args {
+    pub fn build(f: impl FnOnce(&mut Self)) -> Self {
+        let mut args = Self::default();
+        f(&mut args);
+        args
+    }
 }
 
 /// CLI entry point.
-///
-/// # Panics
-///
-/// For some fatal errors.
-///
-/// # Errors
-///
-/// For other fatal errors.
 #[instrument(level = "debug", skip(args))]
 pub fn main(args: Args) -> Result<()> {
     let repo = open_or_init_repo(&args)?;
+
+    let args = Args::build(|args| {});
+
+    // TODO: move most of the following to RepositoryExt::Save
 
     let head = match repo.head() {
         Ok(head) => Some(head.peel_to_commit().unwrap()),
@@ -219,7 +270,7 @@ pub fn main(args: Args) -> Result<()> {
         }
     }
 
-    if !args.dry_run {
+    if !args.no_head {
         index.write()?;
     } else {
         info!("Skipping index write because this is a dry run.");
@@ -277,7 +328,7 @@ pub fn main(args: Args) -> Result<()> {
 
     debug!("Prepared commit {}", commit.id());
 
-    if !args.dry_run {
+    if !args.no_head {
         let mut head_ref = repo.head()?;
         info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
         if head_ref.is_branch() {
@@ -326,7 +377,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
     let config = repo.config()?;
 
     let user_name: String = {
-        if let Some(ref args_name) = args.name {
+        if let Some(ref args_name) = args.author {
             trace!(
                 "Using author name from command line argument: {:?}",
                 &args_name
@@ -357,7 +408,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
         }
     };
 
-    let user_email: String = if let Some(ref args_email) = args.email {
+    let user_email: String = if let Some(ref args_email) = args.author {
         trace!(
             "Using author email from command line argument: {:?}",
             &args_email
@@ -422,7 +473,7 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
                 bail!("Current directory is empty, skipping auto-init (--empty to override).");
             } else {
                 info!("Initializing a new Git repository in: {:?}", path);
-                if args.dry_run {
+                if args.no_head {
                     bail!("Can't initialize a new repository on a dry run.");
                 }
                 Repository::init_opts(
