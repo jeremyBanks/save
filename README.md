@@ -22,7 +22,7 @@ OPTIONS:
     -V, --version
             Print version information
 
-GENERAL OPTIONS::
+GENERAL OPTIONS:
     -q, --quiet
             Decrease log verbosity. May be repeated to decrease verbosity further
 
