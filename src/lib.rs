@@ -58,7 +58,7 @@
 )]
 
 pub mod cli;
-pub mod git2;
+pub mod git_ext;
 pub mod hex;
 pub mod testing;
 pub mod zigzag;
