@@ -105,6 +105,9 @@ pub struct Args {
 
     /// The required commit ID hash or prefix, in hex.
     ///
+    /// This supports some values with special meanings:
+    ///
+    ///
     /// [default: the first four hex digits of the commit's tree hash]
     #[clap(
         long = "prefix",
