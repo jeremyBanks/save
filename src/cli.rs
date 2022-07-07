@@ -235,9 +235,7 @@ impl Args {
 pub fn main(args: Args) -> Result<()> {
     let repo = open_or_init_repo(&args)?;
 
-    let args = Args {
-        ..Args::default()
-    };
+    let args = Args { ..Args::default() };
 
     // TODO: move most of the following to RepositoryExt::Save
 
