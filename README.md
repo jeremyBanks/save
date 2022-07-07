@@ -28,6 +28,32 @@ OPTIONS:
     -V, --version
             Print version information
 
+CONTENT OPTIONS:
+    -a, --all
+            Commit all files in the repository. This is the default.
+            
+            The commit will fail if there are no changes, unless `--allow-empty` is set.
+
+    -s, --staged
+            Commit only files that have been explicitly staged with `git add`.
+            
+            This is like the default behaviour of `git commit`. The commit will fail if there are no
+            staged changes unless `--allow-empty` is set.
+
+        --tree <TREE>
+            Include the specified tree object in the commit, without looking at or modifying the
+            index or working tree
+
+    -e, --empty
+            Don't include any file changes in the commit.
+            
+            This commit will have the same tree hash as its parent.
+
+        --allow-empty
+            Create the commit even if it contains no changes
+            
+            [env: SAVE_ALLOW_EMPTY=]
+
 COMMIT OPTIONS:
     -m, --message <MESSAGE>
             The commit message.
@@ -57,32 +83,6 @@ COMMIT OPTIONS:
             manually add a reference to it.
             
             [aliases: dry-run]
-
-CONTENT OPTIONS:
-    -a, --all
-            Commit all files in the repository. This is the default.
-            
-            The commit will fail if there are no changes, unless `--allow-empty` is set.
-
-    -s, --staged
-            Commit only files that have been explicitly staged with `git add`.
-            
-            This is like the default behaviour of `git commit`. The commit will fail if there are no
-            staged changes unless `--allow-empty` is set.
-
-        --tree <TREE>
-            Include the specified tree object in the commit, without looking at or modifying the
-            index or working tree
-
-    -e, --empty
-            Don't include any file changes in the commit.
-            
-            This commit will have the same tree hash as its parent.
-
-        --allow-empty
-            Create the commit even if it contains no changes
-            
-            [env: SAVE_ALLOW_EMPTY=]
 
 SIGNATURE OPTIONS:
     -t, --timestamp <TIMESTAMP>
