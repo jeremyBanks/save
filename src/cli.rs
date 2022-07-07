@@ -108,12 +108,13 @@ pub struct Args {
     /// This supports some values with special meanings:
     ///
     /// - `_` underscore skips a character whose value we don't care about.
-    /// - 'T' represents the next nibble of the tree hash.
+    /// - 'T' is replaced with the next nibble of the tree hash.
     /// - 'R' is replaced with the last digits of the revision index.
     /// - 'G' is replaced with the last digits of the generation index.
     /// - 'N' is replaced with the last digits of the commit index.
     ///
-    /// [default: "TTTT" (the first four hex digits of the commit's tree hash)]
+    /// [default: "TTTT", representing the first four hex digits of the commit's
+    /// tree hash]
     #[clap(
         long = "prefix",
         help_heading = "COMMIT OPTIONS",
