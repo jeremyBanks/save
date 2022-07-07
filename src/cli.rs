@@ -110,11 +110,10 @@ pub struct Args {
     /// - `_` underscore skips a character whose value we don't care about.
     /// - 'T' represents the next nibble of the tree hash.
     /// - 'R' is replaced with the last digits of the revision index.
-    ///- 'R' is replaced with the last digits of the revision index.
-    /// - 'N' is replaced with the last digits of the commit number.
+    /// - 'G' is replaced with the last digits of the generation index.
+    /// - 'N' is replaced with the last digits of the commit index.
     ///
-    ///
-    /// [default: the first four hex digits of the commit's tree hash]
+    /// [default: "TTTT" (the first four hex digits of the commit's tree hash)]
     #[clap(
         long = "prefix",
         help_heading = "COMMIT OPTIONS",
