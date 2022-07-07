@@ -87,9 +87,23 @@ pub struct Args {
         long,
         help_heading = "COMMIT OPTIONS",
         short = 'm',
-        env = "SAVE_COMMIT_MESSAGE"
+        env = "SAVE_COMMIT_MESSAGE",
+        
     )]
     pub message: Option<String>,
+
+    /// The commit message, but
+    ///
+    /// [default: a short string based on the commit's tree hash and ancestry
+    /// graph]
+    #[clap(
+        long,
+        help_heading = "COMMIT OPTIONS",
+        short = 'M',
+        env = "SAVE_COMMIT_MESSAGE_PREFIX"
+    )]
+    pub message_prefix: Option<String>,
+
     /// The required commit ID hash or prefix, in hex.
     ///
     /// [default: the first four hex digits of the commit's tree hash]
