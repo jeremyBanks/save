@@ -17,12 +17,12 @@ use {
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 
-/// Would you like to SAVE the change?
+/// Would you like to
+/// SAVE the change?
 ///
 /// Commit everything in the current Git repository, no questions asked.
 #[derive(Parser, Debug, Clone, Default)]
 #[clap(
-    about = "\nWould you like to \nSAVE the change?",
     after_help = {
         static AFTER_HELP: Lazy<String> = Lazy::new(|| format!("LINKS:
     https://docs.rs/save/{VERSION}
