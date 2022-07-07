@@ -1,12 +1,6 @@
-use ::{
-    git2::Repository,
-    save::{
-        git2::RepositoryExt,
-        testing::{assert_at, assert_debug_eq},
-    },
-};
+use ::{git2::Repository, save::git2::RepositoryExt};
 
 #[test]
 fn cli() {
-    let mut repo = Repository::temporary();
+    let _repo = Repository::temporary();
 }
