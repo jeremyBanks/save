@@ -103,9 +103,9 @@ pub struct Args {
     )]
     pub message_prefix: Option<String>,
 
-    /// The required commit ID hash or prefix, in hex.
+    /// The required commit ID hash or prefix, in hex. This will be brute-forced.
     ///
-    /// This supports some values with special meanings:
+    /// This supports some non-hex values with special meanings:
     ///
     /// - `_` underscore skips a character whose value we don't care about.
     /// - 'T' is replaced with the next nibble of the tree hash.
