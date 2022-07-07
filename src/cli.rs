@@ -60,22 +60,39 @@ pub struct Args {
     /// This is like the default behaviour of `git commit`.
     /// The commit will fail if there are no staged changes unless
     /// `--allow-empty` is set.
-    #[clap(long, help_heading="CONTENT OPTIONS", short = 's', conflicts_with_all = &["all", "tree", "empty"])]
+    #[clap(
+        help_heading = "CONTENT OPTIONS",
+        long,
+        short = 's',
+        conflicts_with_all = &["all", "tree", "empty"]
+    )]
     pub staged: bool,
 
     /// Include the specified tree object in the commit, without looking at or
     /// modifying the index or working tree.
-    #[clap(long, help_heading="CONTENT OPTIONS", conflicts_with_all = &["all", "staged", "empty"])]
+    #[clap(
+        help_heading = "CONTENT OPTIONS",
+        long,
+        conflicts_with_all = &["all", "staged", "empty"]
+    )]
     pub tree: Option<String>,
 
     /// Don't include any file changes in the commit.
     ///
     /// This commit will have the same tree hash as its parent.
-    #[clap(long, help_heading="CONTENT OPTIONS", short = 'e', conflicts_with_all = &["all", "staged", "tree"])]
+    #[clap(
+        help_heading = "CONTENT OPTIONS",
+        long,
+        short = 'e', conflicts_with_all = &["all", "staged", "tree"]
+    )]
     pub empty: bool,
 
     /// Create the commit even if it contains no changes.
-    #[clap(long, help_heading = "CONTENT OPTIONS", env = "SAVE_ALLOW_EMPTY")]
+    #[clap(
+        help_heading = "CONTENT OPTIONS",
+        long,
+        env = "SAVE_ALLOW_EMPTY"
+    )]
     pub allow_empty: bool,
 
     /// The commit message.
