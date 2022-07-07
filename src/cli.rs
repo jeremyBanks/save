@@ -89,10 +89,7 @@ pub struct Args {
 
     /// Create the commit even if it contains no changes.
     #[clap(
-        help_heading = "CONTENT OPTIONS",
-        long,
-        env = "SAVE_ALLOW_EMPTY"
-    )]
+        help_heading = "CONTENT OPTIONS", long, env = "SAVE_ALLOW_EMPTY")]
     pub allow_empty: bool,
 
     /// The commit message.
