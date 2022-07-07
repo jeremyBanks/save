@@ -222,7 +222,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn build(f: impl FnOnce(&mut Self)) -> Self {
+    pub fn build<F: FnOnce(&mut Self) -> T, T>(f: F) -> Self {
         let mut args = Self::default();
         f(&mut args);
         args
