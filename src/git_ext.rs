@@ -2,6 +2,7 @@
 
 use {
     crate::zigzag::ZugZug,
+    std::borrow::BorrowMut,
     ::{
         core::{
             borrow::Borrow,
@@ -26,7 +27,7 @@ use {
 };
 
 /// Extension methods for [`Repository`].
-pub trait RepositoryExt: Borrow<Repository> {
+pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// Returns a Index with the current contents of the repository's working
     /// tree, as though everything inside of it had been committed on top of
     /// the current head. Submodules are skipped with a warning logged.
