@@ -3,9 +3,15 @@
 use {
     crate::zigzag::ZugZug,
     ::{
+        core::{
+            borrow::Borrow,
+            fmt::Debug,
+            intrinsics::transmute,
+            ops::{Deref, DerefMut},
+        },
         digest::{generic_array::GenericArray, typenum::U20, Digest},
         eyre::{Context, Result},
-        git2::{Commit, Index, ObjectType, Oid, Repository, Signature},
+        git2::{Commit, ErrorCode, Index, ObjectType, Oid, Repository, Signature},
         itertools::Itertools,
         parking_lot::RwLock,
         petgraph::{
@@ -13,15 +19,9 @@ use {
             visit::Topo,
             EdgeDirection::{Incoming, Outgoing},
         },
-        std::{
-            borrow::Borrow,
-            fmt::Debug,
-            intrinsics::transmute,
-            ops::{Deref, DerefMut},
-            path::PathBuf,
-        },
+        std::path::PathBuf,
         tempfile::TempDir,
-        tracing::{debug, instrument, trace, warn},
+        tracing::{debug, info, instrument, trace, warn},
     },
 };
 
@@ -89,17 +89,79 @@ pub trait RepositoryExt: Borrow<Repository> {
     /// author of the current HEAD commit. If there *is* no HEAD commit, we
     /// fall back to a generic placeholder signature.
     fn signature_or_fallback(&self) -> Signature {
-        let _default_name = "dev";
-        let _default_email = "dev@localhost";
-
         let repo: &Repository = self.borrow();
-        let _signature = repo.signature();
 
-        todo!()
+        if let Ok(signature) = repo.signature() {
+            return signature;
+        }
+
+        let placeholder_name = "user";
+        let placeholder_email = "user@localhost";
+
+        let head = match self.borrow().head() {
+            Ok(head) => Some(head.peel_to_commit().unwrap()),
+            Err(err) if err.code() == ErrorCode::UnbornBranch => None,
+            Err(err) => {
+                panic!("Unexpected error from Git: {err:#?}");
+            },
+        };
+
+        let (user_name, user_email) = {
+            let config = self.borrow().config().unwrap();
+
+            let user_name: String = {
+                if let Ok(config_name) = config.get_string("user.name") {
+                    debug!("Using author name from Git configuration: {config_name:?}",);
+                    config_name
+                } else if let Some(previous_name) = head
+                    .as_ref()
+                    .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+                {
+                    info!("{previous_name}");
+                    previous_name
+                } else {
+                    warn!(
+                        "No author name found, falling back to placeholder: {placeholder_name:?}",
+                    );
+                    placeholder_name.to_string()
+                }
+            };
+
+            let user_email: String = if let Ok(config_email) = config.get_string("user.email") {
+                debug!(
+                    "Using author email from Git configuration: {:?}",
+                    &config_email
+                );
+                config_email
+            } else if let Some(previous_email) = head
+                .as_ref()
+                .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+            {
+                info!(
+                    "Using author email from previous commit: {:?}",
+                    &previous_email
+                );
+                previous_email
+            } else {
+                warn!(
+                    "No author email found, falling back to placeholder: {:?}",
+                    &placeholder_email
+                );
+                placeholder_email.to_string()
+            };
+
+            (user_name, user_email)
+        };
+
+        // let signature = self.borrow().signature();
+
+        todo!();
     }
 
     /// Saves all changes in the working directory to this repository using
     /// sensible defaults.
+    ///
+    /// This is equivalent to running the `save` CLI command wih no arguments.
     ///
     /// # Errors
     ///

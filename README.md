@@ -7,7 +7,7 @@ $ save --help
 ```
 
 ```text
-save 0.20220708.0
+save v0.20220708.0
 Would you like to SAVE the change?
 
 Commit everything in the current Git repository, no questions asked.
@@ -16,6 +16,25 @@ USAGE:
     save [OPTIONS]
 
 OPTIONS:
+    -n, --dry-run
+            Prepare the commit, but don't actually update any references in Git.
+            
+            The commit will be written to the Git database, so it is still possible for the user to
+            manually add a reference to it.
+
+    -q, --quiet
+            Decrease log verbosity. May be repeated to decrease verbosity further
+
+    -v, --verbose
+            Increase log verbosity. May be repeated to increase verbosity further
+
+    -h, --help
+            Print help information
+
+    -V, --version
+            Print version information
+
+COMMIT OPTIONS:
     -m, --message <MESSAGE>
             The commit message.
             
@@ -23,16 +42,28 @@ OPTIONS:
             
             [env: SAVE_COMMIT_MESSAGE=]
 
+    -x, --prefix <PREFIX_HEX>
+            The required commit hash or prefix, in hex.
+            
+            [default: the first four hex digits of the commit's tree hash]
+            
+            [env: SAVE_COMMIT_PREFIX=]
+
+TREE OPTIONS:
     -a, --all
             Commit all files in the repository. This is the default.
             
-            The commit will fail if there are no changes unless `--allow-empty` is set.
+            The commit will fail if there are no changes, unless `--allow-empty` is set.
 
     -s, --staged
             Commit only files that have been explicitly staged with `git add`.
             
             This is like the default behaviour of `git commit`. The commit will fail if there are no
             staged changes unless `--allow-empty` is set.
+
+        --tree <TREE>
+            Include the specified tree object in the commit, without looking at or modifying the
+            index or working tree
 
     -e, --empty
             Don't include any file changes in the commit.
@@ -42,31 +73,18 @@ OPTIONS:
         --allow-empty
             Create the commit even if it contains no changes
 
-    -n, --dry-run
-            Prepare the commit, but don't actually update any references in Git.
-            
-            The commit will be written to the Git database, so it is still possible for the user to
-            manually add a reference to it.
-
-    -x, --prefix <PREFIX_HEX>
-            The required commit hash or prefix, in hex.
-            
-            [default: the first four hex digits of the commit's tree hash]
-            
-            [env: SAVE_COMMIT_PREFIX=]
-
+SIGNATURE OPTIONS:
     -t, --timestamp <TIMESTAMP>
             Override the system clock timestamp value
             
             [env: SAVE_TIMESTAMP=]
 
     -0, --timeless
-            Use the next available timestamp after the previous commit, regardless of the current
-            timestamp.
-            
-            If there is no previous commit, this uses the next available timestamp after the current
-            time (or value provided to `--timestamp`) rounded down to the closest multiple of
-            `0x1000000` (a period of ~6 months).
+            Use the next available timestamp after the parent commit's timestamps, regardless of the
+            actual current clock time. Assuming there is a parent commit, this is equivalent to
+            `--timestamp=0`. If we're creating an initial commit (with no parents), this uses the
+            next available timestamp after the current time (or value provided to `--timestamp`)
+            rounded down to the closest multiple of `0x1000000` (a period of ~6 months).
             
             This can be used to help produce deterministic timestamps and commit IDs for
             reproducible builds.
@@ -87,31 +105,27 @@ OPTIONS:
             
             [env: GIT_AUTHOR_EMAIL=]
 
-        --squash
+GRAPH OPTIONS:
+    -u, --squash
             Squashes these changes into the first parent. May be repeated multiple times to squash
-            multiple ancestors
+            multiple generations
             
             [aliases: amend]
 
-        --add-parent <ADDED_PARENT_REF>
-            Adds another parent to the new commit. May be repeated to add multiple parents
+        --squash-to <SQUASH_TO_REF>
+            Squashes all changes from this commit up to the specified ancestor commit.
+            
+            This will fail if the specified commit isn't actually an ancestor.
 
-        --rm-parent <REMOVED_PARENT_REF>
-            Removes a parent from the new commit. May be repeated to remove multiple parents
+    -p, --add-parent <PARENT_REF>
+            Adds another parent to the new commit. May be repeated to add multiple parents, though
+            duplicated parents will are ignored
 
-    -q, --quiet
-            Decrease log verbosity. May be repeated to decrease verbosity further
-
-    -v, --verbose
-            Increase log verbosity. May be repeated to increase verbosity further
-
-    -h, --help
-            Print help information
-
-    -V, --version
-            Print version information
+        --remove-parent <REMOVED_PARENT_REF>
+            Removes a parent from the new commit. May be repeated to remove multiple parents. If the
+            parent is not present, this will fail with an error
 
 LINKS:
-    https://docs.rs/save/0.20220708.0
-    https://crates.io/crates/save/0.20220708.0
+    https://docs.rs/save/v0.20220708.0
+    https://crates.io/crates/save/v0.20220708.0
 ```

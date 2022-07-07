@@ -14,8 +14,7 @@ use {
     },
 };
 
-const CARGO_PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
-const CARGO_PKG_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// Would you like to SAVE the change?
 ///
@@ -24,28 +23,33 @@ const CARGO_PKG_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 #[clap(
     after_help = {
         static AFTER_HELP: Lazy<String> = Lazy::new(|| format!("LINKS:
-    https://docs.rs/{CARGO_PKG_NAME}/{CARGO_PKG_VERSION}
-    https://crates.io/crates/{CARGO_PKG_NAME}/{CARGO_PKG_VERSION}"));
+    https://docs.rs/save/{VERSION}
+    https://crates.io/crates/save/{VERSION}"));
         AFTER_HELP.as_ref()
     },
     dont_collapse_args_in_usage = true,
     infer_long_args = true,
     setting = AppSettings::DeriveDisplayOrder,
-    version
+    version = VERSION,
 )]
 pub struct Args {
     /// The commit message.
     ///
     /// [default: a short string based on the commit's tree hash and ancestry
     /// graph]
-    #[clap(long, short = 'm', env = "SAVE_COMMIT_MESSAGE")]
+    #[clap(
+        long,
+        help_heading = "COMMIT OPTIONS",
+        short = 'm',
+        env = "SAVE_COMMIT_MESSAGE"
+    )]
     pub message: Option<String>,
 
     /// Commit all files in the repository. This is the default.
     ///
-    /// The commit will fail if there are no changes unless `--allow-empty` is
+    /// The commit will fail if there are no changes, unless `--allow-empty` is
     /// set.
-    #[clap(long, short = 'a', conflicts_with = "staged", conflicts_with = "empty")]
+    #[clap(long, help_heading="TREE OPTIONS", short = 'a', conflicts_with_all = &["staged", "tree", "empty"])]
     pub all: bool,
 
     /// Commit only files that have been explicitly staged with `git add`.
@@ -53,17 +57,22 @@ pub struct Args {
     /// This is like the default behaviour of `git commit`.
     /// The commit will fail if there are no staged changes unless
     /// `--allow-empty` is set.
-    #[clap(long, short = 's', conflicts_with = "all", conflicts_with = "empty")]
+    #[clap(long, help_heading="TREE OPTIONS", short = 's', conflicts_with_all = &["all", "tree", "empty"])]
     pub staged: bool,
+
+    /// Include the specified tree object in the commit, without looking at or
+    /// modifying the index or working tree.
+    #[clap(long, help_heading="TREE OPTIONS", conflicts_with_all = &["all", "staged", "empty"])]
+    pub tree: Option<String>,
 
     /// Don't include any file changes in the commit.
     ///
     /// This commit will have the same tree hash as its parent.
-    #[clap(long, short = 'e', conflicts_with = "all", conflicts_with = "staged")]
+    #[clap(long, help_heading="TREE OPTIONS", short = 'e', conflicts_with_all = &["all", "staged", "tree"])]
     pub empty: bool,
 
     /// Create the commit even if it contains no changes.
-    #[clap(long)]
+    #[clap(long, help_heading = "TREE OPTIONS")]
     pub allow_empty: bool,
 
     /// Prepare the commit, but don't actually update any references in Git.
@@ -76,51 +85,84 @@ pub struct Args {
     /// The required commit hash or prefix, in hex.
     ///
     /// [default: the first four hex digits of the commit's tree hash]
-    #[clap(long = "prefix", short = 'x', env = "SAVE_COMMIT_PREFIX")]
+    #[clap(
+        long = "prefix",
+        help_heading = "COMMIT OPTIONS",
+        short = 'x',
+        env = "SAVE_COMMIT_PREFIX"
+    )]
     pub prefix_hex: Option<String>,
 
     /// Override the system clock timestamp value.
-    #[clap(long, short = 't', env = "SAVE_TIMESTAMP")]
+    #[clap(
+        long,
+        help_heading = "SIGNATURE OPTIONS",
+        short = 't',
+        env = "SAVE_TIMESTAMP"
+    )]
     pub timestamp: Option<i64>,
 
-    /// Use the next available timestamp after the previous commit, regardless
-    /// of the current timestamp.
-    ///
-    /// If there is no previous commit, this uses the next available timestamp
+    /// Use the next available timestamp after the parent commit's timestamps,
+    /// regardless of the actual current clock time. Assuming there is a parent
+    /// commit, this is equivalent to `--timestamp=0`. If we're creating an
+    /// initial commit (with no parents), this uses the next available timestamp
     /// after the current time (or value provided to `--timestamp`) rounded down
     /// to the closest multiple of `0x1000000` (a period of ~6 months).
     ///
     /// This can be used to help produce deterministic timestamps and commit
     /// IDs for reproducible builds.
-    #[clap(long, short = '0', env = "SAVE_TIMELESS")]
+    #[clap(
+        long,
+        help_heading = "SIGNATURE OPTIONS",
+        short = '0',
+        env = "SAVE_TIMELESS"
+    )]
     pub timeless: bool,
 
     /// The name to use for the commit's author and committer.
     ///
     /// [default: name from git, or else from parent commit, or else "user"]
-    #[clap(long, env = "GIT_AUTHOR_NAME")]
+    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "GIT_AUTHOR_NAME")]
     pub name: Option<String>,
 
     /// The email to use for the commit's author and committer.
     ///
     /// [default: email from git, or else from parent commit, or else
     /// "user@localhost"]
-    #[clap(long, env = "GIT_AUTHOR_EMAIL")]
+    #[clap(long, help_heading = "SIGNATURE OPTIONS", env = "GIT_AUTHOR_EMAIL")]
     pub email: Option<String>,
 
     /// Squashes these changes into the first parent. May be repeated multiple
-    /// times to squash multiple ancestors.
-    #[clap(long, parse(from_occurrences), visible_alias = "amend")]
+    /// times to squash multiple generations.
+    #[clap(
+        long,
+        help_heading = "GRAPH OPTIONS",
+        short = 'u',
+        parse(from_occurrences),
+        visible_alias = "amend",
+        conflicts_with = "squash-to-ref"
+    )]
     pub squash: u32,
 
+    /// Squashes all changes from this commit up to the specified ancestor
+    /// commit.
+    ///
+    /// This will fail if the specified commit isn't actually an ancestor.
+    #[clap(
+        long = "squash-to",
+        help_heading = "GRAPH OPTIONS",
+        conflicts_with = "squash"
+    )]
+    pub squash_to_ref: Option<String>,
+
     /// Adds another parent to the new commit. May be repeated to add multiple
-    /// parents.
-    #[clap(long = "add-parent")]
-    pub added_parent_ref: Vec<String>,
+    /// parents, though duplicated parents will are ignored.
+    #[clap(long = "add-parent", help_heading = "GRAPH OPTIONS", short = 'p')]
+    pub parent_ref: Vec<String>,
 
     /// Removes a parent from the new commit. May be repeated to remove multiple
-    /// parents.
-    #[clap(long = "rm-parent")]
+    /// parents. If the parent is not present, this will fail with an error.
+    #[clap(long = "remove-parent", help_heading = "GRAPH OPTIONS")]
     pub removed_parent_ref: Vec<String>,
 
     /// Decrease log verbosity. May be repeated to decrease verbosity further.
@@ -276,6 +318,7 @@ pub fn main(args: Args) -> Result<()> {
 }
 
 /// Determine the Git user name and email to use.
+/// XXX: This should be removed or merged into git2.rs.
 #[instrument(level = "debug", skip(repo))]
 fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
     // TODO: move this to git2.rs, right?
@@ -349,6 +392,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
 
 /// Opens or initializes a new [git2::Repository] in CWD or GIT_DIR, if args
 /// allow it.
+/// XXX: This should be removed or merged into git2.rs.
 #[instrument(level = "debug")]
 fn open_or_init_repo(args: &Args) -> Result<Repository> {
     let repo = match Repository::open_from_env() {
@@ -410,7 +454,7 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
 /// conflicting global initialization of systems such as logging.
 #[must_use]
 pub fn init() -> Args {
-    color_eyre::install().unwrap();
+    ::color_eyre::install().unwrap();
 
     let args = Args::parse();
 
@@ -441,18 +485,20 @@ pub fn init() -> Args {
         format!("{verbosity_other},save={verbosity_self}")
     };
 
-    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::Layer::with_subscriber(
-        tracing_error::ErrorLayer::default(),
-        tracing_subscriber::fmt()
-            .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
-            .with_target(false)
-            .with_span_events(
-                tracing_subscriber::fmt::format::FmtSpan::ENTER
-                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-            )
-            .compact()
-            .finish(),
-    ));
+    ::tracing_subscriber::util::SubscriberInitExt::init(
+        tracing_subscriber::Layer::with_subscriber(
+            ::tracing_error::ErrorLayer::default(),
+            ::tracing_subscriber::fmt()
+                .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
+                .with_target(false)
+                .with_span_events(
+                    tracing_subscriber::fmt::format::FmtSpan::ENTER
+                        | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+                )
+                .compact()
+                .finish(),
+        ),
+    );
 
     trace!("Initialized from: {:#?}", args);
 

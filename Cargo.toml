@@ -30,21 +30,6 @@ tracing = { features = ["log"], version = "0.1.35" }
 tracing-error = { features = ["traced-error"], version = "0.2.0" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.14" }
 
-[dev-dependencies]
-criterion = { features = ["html_reports"], version = "0.3.5" }
-crossterm = "0.24.0"
-iai = "0.1.1"
-rand = "0.8.5"
-rand_pcg = "0.3.1"
-
-[[bench]]
-name = "criterion"
-harness = false
-
-[[bench]]
-name = "iai"
-harness = false
-
 [package.metadata.release]
 allow-branch = ["trunk"]
 post-release-commit-message = "v{{next_version}}"

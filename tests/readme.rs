@@ -10,6 +10,10 @@ fn readme() {
         .unwrap()
         .wait_with_output()
         .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate --help for readme"
+    );
     let version = env!("CARGO_PKG_VERSION");
     actual.push_str(&format!(
         "```sh
