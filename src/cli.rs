@@ -44,19 +44,7 @@ pub struct Args {
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
 
-    // COMMIT OPTIONS:
-    /// The commit message.
-    ///
-    /// [default: a short string based on the commit's tree hash and ancestry
-    /// graph]
-    #[clap(
-        long,
-        help_heading = "COMMIT OPTIONS",
-        short = 'm',
-        env = "SAVE_COMMIT_MESSAGE"
-    )]
-    pub message: Option<String>,
-
+    // CONTENT OPTIONS:
     /// Commit all files in the repository. This is the default.
     ///
     /// The commit will fail if there are no changes, unless `--allow-empty` is
@@ -72,18 +60,6 @@ pub struct Args {
     #[clap(long, help_heading="CONTENT OPTIONS", short = 's', conflicts_with_all = &["all", "tree", "empty"])]
     pub staged: bool,
 
-    /// The required commit ID hash or prefix, in hex.
-    ///
-    /// [default: the first four hex digits of the commit's tree hash]
-    #[clap(
-        long = "prefix",
-        help_heading = "COMMIT OPTIONS",
-        short = 'x',
-        env = "SAVE_COMMIT_PREFIX"
-    )]
-    pub prefix_hex: Option<String>,
-
-    // CONTENT OPTIONS:
     /// Include the specified tree object in the commit, without looking at or
     /// modifying the index or working tree.
     #[clap(long, help_heading="CONTENT OPTIONS", conflicts_with_all = &["all", "staged", "empty"])]
@@ -98,6 +74,29 @@ pub struct Args {
     /// Create the commit even if it contains no changes.
     #[clap(long, help_heading = "CONTENT OPTIONS", env = "SAVE_ALLOW_EMPTY")]
     pub allow_empty: bool,
+
+    // COMMIT OPTIONS:
+    /// The commit message.
+    ///
+    /// [default: a short string based on the commit's tree hash and ancestry
+    /// graph]
+    #[clap(
+        long,
+        help_heading = "COMMIT OPTIONS",
+        short = 'm',
+        env = "SAVE_COMMIT_MESSAGE"
+    )]
+    pub message: Option<String>,
+    /// The required commit ID hash or prefix, in hex.
+    ///
+    /// [default: the first four hex digits of the commit's tree hash]
+    #[clap(
+        long = "prefix",
+        help_heading = "COMMIT OPTIONS",
+        short = 'x',
+        env = "SAVE_COMMIT_PREFIX"
+    )]
+    pub prefix_hex: Option<String>,
 
     // SIGNATURE OPTIONS:
     /// Override the system clock timestamp value.
