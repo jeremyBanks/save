@@ -88,11 +88,11 @@ pub struct Args {
         help_heading = "COMMIT OPTIONS",
         short = 'm',
         env = "SAVE_COMMIT_MESSAGE",
-        
+        conflicts_with = "message-prefix"
     )]
     pub message: Option<String>,
 
-    /// The commit message, but
+    /// The commit message, but if we're squashing/amending another commit, 
     ///
     /// [default: a short string based on the commit's tree hash and ancestry
     /// graph]
