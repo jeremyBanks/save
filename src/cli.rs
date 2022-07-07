@@ -21,10 +21,10 @@ const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 #[clap(
     about = "Commit everything in the current Git repository -- no questions asked.",
     long_about = "
-╔═══════════════════╗
-║ Would you like to ║
-║ SAVE the change?  ║
-╚═══════════════════╝
+╔══════════════════╗
+║Would you like to ║
+║SAVE the change?  ║
+╚══════════════════╝
 
 Commit everything in the current Git repository -- no questions asked.
 ",
@@ -171,7 +171,8 @@ pub struct Args {
 
     /// The name and email to use for the commit's author.
     ///
-    /// [default: name from git, or else from parent commit, or else "user"]
+    /// [default: name from git, or else from parent commit, or else "user
+    /// <user@localhost>"]
     #[clap(help_heading = "SIGNATURE OPTIONS", long, env = "SAVE_AUTHOR")]
     pub author: Option<String>,
 
@@ -188,8 +189,8 @@ pub struct Args {
     #[clap(
         help_heading = "COMMIT OPTIONS",
         long,
-        env = "SAVE_HEAD",
-        conflicts_with = "no-head"
+        conflicts_with = "no-head",
+        env = "SAVE_HEAD"
     )]
     pub head: Option<i64>,
 
@@ -202,18 +203,28 @@ pub struct Args {
         long,
         short = 'n',
         visible_alias = "dry-run",
-        conflicts_with = "head"
+        conflicts_with = "head",
+        env = "SAVE_NO_HEAD"
     )]
     pub no_head: bool,
 
     /// Adds another parent to the new commit. May be repeated to add multiple
     /// parents, though duplicated parents will are ignored.
-    #[clap(help_heading = "HISTORY OPTIONS", long = "add-parent", short = 'p')]
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "add-parent",
+        short = 'p',
+        env = "SAVE_ADD_PARENT"
+    )]
     pub added_parent_ref: Vec<String>,
 
     /// Removes a parent from the new commit. May be repeated to remove multiple
     /// parents. If the parent is not present, this will fail with an error.
-    #[clap(help_heading = "HISTORY OPTIONS", long = "remove-parent")]
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "remove-parent",
+        env = "SAVE_REMOVE_PARENTS"
+    )]
     pub removed_parent_ref: Vec<String>,
 
     /// Squashes these changes into the first parent. May be repeated multiple
@@ -225,7 +236,8 @@ pub struct Args {
         short = 'u',
         parse(from_occurrences),
         visible_alias = "amend",
-        conflicts_with = "squash-tail-ref"
+        conflicts_with = "squash-tail-ref",
+        env = "SAVE_SQUASH_COUNT"
     )]
     pub squash: u32,
 
@@ -237,7 +249,8 @@ pub struct Args {
     #[clap(
         help_heading = "HISTORY OPTIONS",
         long = "squash-tail",
-        conflicts_with = "squash"
+        conflicts_with = "squash",
+        env = "SAVE_SQUASH_TAIL"
     )]
     pub squash_tail_ref: Vec<String>,
 
@@ -249,7 +262,8 @@ pub struct Args {
     #[clap(
         long = "squash-after-head",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["squash-tail-ref", "retcon-all"]
+        conflicts_with_all = &["squash-tail-ref", "retcon-all"],
+        env = "SAVE_SQUASH_AFTER_HEAD"
     )]
     pub squash_after_head_ref: Vec<String>,
 
@@ -261,7 +275,8 @@ pub struct Args {
     #[clap(
         long = "retcon-tail",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-after-head-ref", "retcon-all"]
+        conflicts_with_all = &["retcon-after-head-ref", "retcon-all"],
+        env = "SAVE_RETCON_TAIL"
     )]
     pub retcon_tail_ref: Vec<String>,
 
@@ -273,7 +288,8 @@ pub struct Args {
     #[clap(
         long = "retcon-after-head",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-tail-ref", "retcon-all"]
+        conflicts_with_all = &["retcon-tail-ref", "retcon-all"],
+        env = "SAVE_RETCON_AFTER_HEAD"
     )]
     pub retcon_after_head_ref: Vec<String>,
 
@@ -283,7 +299,8 @@ pub struct Args {
     #[clap(
         long,
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"]
+        conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"],
+        env = "SAVE_RETCON_ALL"
     )]
     pub retcon_all: bool,
 }
