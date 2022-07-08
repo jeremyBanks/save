@@ -1,3 +1,6 @@
-fn main() -> ::eyre::Result<()> {
-    ::save::cli::main(::save::cli::init())
+use {::clap::Parser, ::eyre::Report, ::save::cli::Save};
+
+fn main() -> Result<(), Report> {
+    ::color_eyre::install()?;
+    Save::parse().save()
 }

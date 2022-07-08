@@ -1,4 +1,6 @@
-#![doc = include_str!("../README.md")]
+//! ```text
+#![doc = include_str!("../README.txt")]
+//! ```
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(unsafe_code)]
 #![warn(
@@ -65,4 +67,6 @@ pub mod hex;
 pub mod testing;
 pub mod zigzag;
 #[doc(inline)]
-pub use ez::*;
+pub use self::ez::*;
+#[doc(inline)]
+pub use self::git2::{CommitExt, OidExt, RepositoryExt};

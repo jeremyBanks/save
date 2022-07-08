@@ -17,35 +17,47 @@ use {
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const V_VERSION: &'static str = concat!("v", env!("CARGO_PKG_VERSION"));
 
+/// Commit everything in the current directory and repository -- no questions asked.
+///
+/// ╔══════════════════╗╔════╗
+/// ║Would you like to ║║►YES║
+/// ║SAVE the changes? ║║ NO ║
+/// ╚══════════════════╝╚════╝
 #[derive(Parser, Debug, Clone, Default)]
 #[clap(
-    about = "Commit everything in the current Git repository -- no questions asked.",
-    long_about = "
-╔══════════════════╗
-║Would you like to ║
-║SAVE the change?  ║
-╚══════════════════╝
-
-Commit everything in the current Git repository -- no questions asked.
-",
     after_help = {
-        static AFTER_HELP: Lazy<String> = Lazy::new(|| format!("LINKS:
+        static S: Lazy<String> = Lazy::new(|| format!("INSTALLATION:
+    save can be installed from a source release using the Cargo package manager:
+
+        cargo install save --version {VERSION}
+
+    Cargo can be installed along with Rust/rustup using its official installer:
+
+        curl -sSf https://sh.rustup.rs | sh
+
+LINKS:
     https://docs.rs/save/{VERSION}
     https://crates.io/crates/save/{VERSION}"));
-        AFTER_HELP.as_ref()
+        S.as_ref()
     },
     dont_collapse_args_in_usage = true,
     infer_long_args = true,
     setting = AppSettings::DeriveDisplayOrder,
-    version = V_VERSION
+    version = V_VERSION,
+    max_term_width = 80,
+    verbatim_doc_comment
 )]
 #[non_exhaustive]
-pub struct Args {
+pub struct Save {
     /// Decrease log verbosity. May be repeated to decrease verbosity further.
+    ///
+    /// [env: RUST_LOG=]
     #[clap(long, short = 'q', parse(from_occurrences))]
     pub quiet: i32,
 
     /// Increase log verbosity. May be repeated to increase verbosity further.
+    ///
+    /// [env: RUST_LOG=]
     #[clap(long, short = 'v', parse(from_occurrences))]
     pub verbose: i32,
 
@@ -99,8 +111,7 @@ pub struct Args {
 
     /// The commit message.
     ///
-    /// [default: a short string based on the commit's tree hash and ancestry
-    /// graph]
+    /// [default: a short string based on the commit's tree hash and ancestry graph]
     #[clap(
         help_heading = "COMMIT OPTIONS",
         long,
@@ -110,9 +121,8 @@ pub struct Args {
     )]
     pub message: Option<String>,
 
-    /// A prefix to put on its own line before the commit message. This is
-    /// typically only useful if you're squashing/amending commits with
-    /// existing messages you want to add to.
+    /// A prefix to put on its own line before the commit message. This is typically only useful if
+    /// you're squashing/amending commits with existing messages you want to add to.
     #[clap(
         help_heading = "COMMIT OPTIONS",
         long,
@@ -121,24 +131,23 @@ pub struct Args {
     )]
     pub message_prefix: Option<String>,
 
-    /// The required commit ID hash or prefix, in hex. This will be
-    /// brute-forced.
+    /// The required commit ID hash or prefix, in hex. This will be brute-forced.
     ///
     /// This supports some non-hex values with special meanings:
     ///
-    /// - `_` underscore skips a character whose value we don't care about.
+    /// - `_` is skipped, for a character whose value we don't care about.
     /// - 'T' is replaced with the next nibble of the tree hash.
     /// - 'R' is replaced with the last digits of the revision index.
     /// - 'G' is replaced with the last digits of the generation index.
     /// - 'N' is replaced with the last digits of the commit index.
     ///
-    /// [default: "TTTT", representing the first four hex digits of the commit's
-    /// tree hash]
+    /// [default: "TTTT", representing the first four hex digits of the commit's tree hash]
     #[clap(
         help_heading = "COMMIT OPTIONS",
         long = "prefix",
         short = 'x',
-        env = "SAVE_COMMIT_PREFIX"
+        env = "SAVE_COMMIT_PREFIX",
+        verbatim_doc_comment
     )]
     pub prefix_hex: Option<String>,
 
@@ -152,15 +161,14 @@ pub struct Args {
     )]
     pub timestamp: Option<i64>,
 
-    /// Use the next available timestamp after the parent commit's timestamps,
-    /// regardless of the actual current clock time. Assuming there is a parent
-    /// commit, this is equivalent to `--timestamp=0`. If we're creating an
-    /// initial commit (with no parents), this uses the next available timestamp
-    /// after the current time (or value provided to `--timestamp`) rounded down
-    /// to the closest multiple of `0x1000000` (a period of ~6 months).
+    /// Use the next available timestamp after the parent commit's timestamps,  regardless of the
+    /// actual current clock time. Assuming there is a parent  commit, this is equivalent to
+    /// `--timestamp=0`. If we're creating an  initial commit (with no parents), this uses the next
+    /// available timestamp  after the current time (or value provided to `--timestamp`) rounded
+    /// down  to the closest multiple of `0x1000000` (a period of ~6 months).
     ///
-    /// This can be used to help produce deterministic timestamps and commit
-    /// IDs for reproducible builds.
+    /// This can be used to help produce deterministic timestamps and commit IDs for reproducible
+    /// builds.
     #[clap(
         help_heading = "SIGNATURE OPTIONS",
         long,
@@ -171,8 +179,7 @@ pub struct Args {
 
     /// The name and email to use for the commit's author.
     ///
-    /// [default: name from git, or else from parent commit, or else "user
-    /// <user@localhost>"]
+    /// [default: name from git, or else from parent commit, or else "user <user@localhost>"]
     #[clap(help_heading = "SIGNATURE OPTIONS", long, env = "SAVE_AUTHOR")]
     pub author: Option<String>,
 
@@ -236,7 +243,7 @@ pub struct Args {
         short = 'u',
         parse(from_occurrences),
         visible_alias = "amend",
-        conflicts_with = "squash-tail-ref",
+        conflicts_with = "squash-to-ref",
         env = "SAVE_SQUASH_COUNT"
     )]
     pub squash: u32,
@@ -248,11 +255,11 @@ pub struct Args {
     /// This will fail if the specified commit isn't actually an ancestor.
     #[clap(
         help_heading = "HISTORY OPTIONS",
-        long = "squash-tail",
+        long = "squash-to",
         conflicts_with = "squash",
-        env = "SAVE_SQUASH_TAIL"
+        env = "SAVE_SQUASH_TO"
     )]
-    pub squash_tail_ref: Vec<String>,
+    pub squash_to_ref: Vec<String>,
 
     /// Squashes every ancestor commit that isn't part included in the target
     /// head(s).
@@ -260,12 +267,22 @@ pub struct Args {
     /// For example, this can be used to squash all changes in a branch by
     /// excluding the upstream branch.
     #[clap(
-        long = "squash-after-head",
+        long = "squash-after",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["squash-tail-ref", "retcon-all"],
-        env = "SAVE_SQUASH_AFTER_HEAD"
+        conflicts_with_all = &["squash-to-ref", "retcon-all"],
+        env = "SAVE_SQUASH_AFTER"
     )]
-    pub squash_after_head_ref: Vec<String>,
+    pub squash_after_ref: Vec<String>,
+
+    /// Squashes the entire repository into a single commit. You probably don't want to use this.
+    /// If you really do, you must set this flag to the value `CONFIRM_SQUASH_ALL`.
+    #[clap(
+        long = "squash-all",
+        help_heading = "HISTORY OPTIONS",
+        conflicts_with_all = &["squash-after-ref", "squash-to-ref"],
+        env = "SAVE_SQUASH_ALL"
+    )]
+    pub squash_all: Option<String>,
 
     /// Rewrites the timestamps and authorship information of all commits up to
     /// the given ancestors based on the current settings.
@@ -273,12 +290,12 @@ pub struct Args {
     /// Commit messages will only be replaced if they match our generated
     /// message pattern, or are empty.
     #[clap(
-        long = "retcon-tail",
+        long = "retcon-to-ref",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-after-head-ref", "retcon-all"],
-        env = "SAVE_RETCON_TAIL"
+        conflicts_with_all = &["retcon-after-ref", "retcon-all"],
+        env = "SAVE_RETCON_TO"
     )]
-    pub retcon_tail_ref: Vec<String>,
+    pub retcon_to_ref: Vec<String>,
 
     /// Retcons every ancestor commit that isn't part included in the target
     /// head(s).
@@ -286,12 +303,12 @@ pub struct Args {
     /// For example, this can be used to retcon all changes in a branch by
     /// excluding the upstream branch.
     #[clap(
-        long = "retcon-after-head",
+        long = "retcon-after",
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-tail-ref", "retcon-all"],
-        env = "SAVE_RETCON_AFTER_HEAD"
+        conflicts_with_all = &["retcon-to-ref", "retcon-all"],
+        env = "SAVE_RETCON_AFTER"
     )]
-    pub retcon_after_head_ref: Vec<String>,
+    pub retcon_after_ref: Vec<String>,
 
     /// Retcons the entire history. You probably don't want to use this,
     /// but if you do use it consistently it should only affect the most
@@ -299,28 +316,76 @@ pub struct Args {
     #[clap(
         long,
         help_heading = "HISTORY OPTIONS",
-        conflicts_with_all = &["retcon-tail-ref", "retcon-after-head-ref"],
+        conflicts_with_all = &["retcon-after-ref", "retcon-to-ref"],
         env = "SAVE_RETCON_ALL"
     )]
     pub retcon_all: bool,
 }
 
-impl Args {
-    pub fn with<F: FnOnce(&mut Self) -> T, T>(f: F) -> Self {
-        let mut args = Self::default();
-        f(&mut args);
-        args
+impl Save {
+    pub fn with<F: FnOnce(&mut Save) -> T, T>(f: F) -> Save {
+        let mut save = Default::default();
+        f(&mut save);
+        save
+    }
+
+    pub fn save(&self) -> Result<(), ::eyre::Report> {
+        let default_verbosity_self = 3;
+        let default_verbosity_other = 1;
+
+        let log_env = env::var("RUST_LOG").unwrap_or_default();
+
+        let rust_log = if self.verbose == 0 && self.quiet == 0 && !log_env.is_empty() {
+            log_env
+        } else {
+            let verbosity_self = match default_verbosity_self + self.verbose - self.quiet {
+                i32::MIN..=0 => "off",
+                1 => "error",
+                2 => "warn",
+                3 => "info",
+                4 => "debug",
+                5..=i32::MAX => "trace",
+            };
+            let verbosity_other = match default_verbosity_other + self.verbose - self.quiet {
+                i32::MIN..=0 => "off",
+                1 => "error",
+                2 => "warn",
+                3 => "info",
+                4 => "debug",
+                5..=i32::MAX => "trace",
+            };
+            format!("{verbosity_other},save={verbosity_self}")
+        };
+
+        let installed_tracing_subscriber = ::tracing_subscriber::util::SubscriberInitExt::try_init(
+            tracing_subscriber::Layer::with_subscriber(
+                ::tracing_error::ErrorLayer::default(),
+                ::tracing_subscriber::fmt()
+                    .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
+                    .with_target(false)
+                    .with_span_events(
+                        tracing_subscriber::fmt::format::FmtSpan::ENTER
+                            | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+                    )
+                    .compact()
+                    .finish(),
+            ),
+        );
+
+        if let Err(err) = installed_tracing_subscriber {
+            debug!("Failed to register global tracing_subscriber: {err}");
+        }
+
+        trace!("Running main with: {self:#?}");
+
+        Ok(())
     }
 }
 
 /// CLI entry point.
 #[instrument(level = "debug", skip(args))]
-pub fn main(args: Args) -> Result<()> {
+pub fn main(args: Save) -> Result<()> {
     let repo = open_or_init_repo(&args)?;
-
-    let args = Args::with(|args| {
-        args.retcon_all = true;
-    });
 
     // TODO: move most of the following to RepositoryExt::Save
 
@@ -457,7 +522,7 @@ pub fn main(args: Args) -> Result<()> {
 /// Determine the Git user name and email to use.
 /// XXX: This should be removed or merged into git2.rs.
 #[instrument(level = "debug", skip(repo))]
-fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
+fn get_git_user(args: &Save, repo: &Repository, head: &Option<Commit>) -> Result<(String, String)> {
     // TODO: move this to git2.rs, right?
 
     let config = repo.config()?;
@@ -531,7 +596,7 @@ fn get_git_user(args: &Args, repo: &Repository, head: &Option<Commit>) -> Result
 /// allow it.
 /// XXX: This should be removed or merged into git2.rs.
 #[instrument(level = "debug")]
-fn open_or_init_repo(args: &Args) -> Result<Repository> {
+fn open_or_init_repo(args: &Save) -> Result<Repository> {
     let repo = match Repository::open_from_env() {
         Ok(repo) => {
             if repo.is_bare() {
@@ -580,64 +645,4 @@ fn open_or_init_repo(args: &Args) -> Result<Repository> {
     }
 
     Ok(repo)
-}
-
-/// Initialize the typical global environment and parses the typical [Args] for
-/// save's [main] CLI entry point.
-///
-/// # Panics
-///
-/// This will panic if called multiple times, or if other code attempts
-/// conflicting global initialization of systems such as logging.
-#[must_use]
-pub fn init() -> Args {
-    ::color_eyre::install().unwrap();
-
-    let args = Args::parse();
-
-    let default_verbosity_self = 3;
-    let default_verbosity_other = 1;
-
-    let log_env = env::var("RUST_LOG").unwrap_or_default();
-
-    let rust_log = if args.verbose == 0 && args.quiet == 0 && !log_env.is_empty() {
-        log_env
-    } else {
-        let verbosity_self = match default_verbosity_self + args.verbose - args.quiet {
-            i32::MIN..=0 => "off",
-            1 => "error",
-            2 => "warn",
-            3 => "info",
-            4 => "debug",
-            5..=i32::MAX => "trace",
-        };
-        let verbosity_other = match default_verbosity_other + args.verbose - args.quiet {
-            i32::MIN..=0 => "off",
-            1 => "error",
-            2 => "warn",
-            3 => "info",
-            4 => "debug",
-            5..=i32::MAX => "trace",
-        };
-        format!("{verbosity_other},save={verbosity_self}")
-    };
-
-    ::tracing_subscriber::util::SubscriberInitExt::init(
-        tracing_subscriber::Layer::with_subscriber(
-            ::tracing_error::ErrorLayer::default(),
-            ::tracing_subscriber::fmt()
-                .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
-                .with_target(false)
-                .with_span_events(
-                    tracing_subscriber::fmt::format::FmtSpan::ENTER
-                        | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-                )
-                .compact()
-                .finish(),
-        ),
-    );
-
-    trace!("Initialized from: {:#?}", args);
-
-    args
 }

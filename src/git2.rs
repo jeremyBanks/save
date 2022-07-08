@@ -257,7 +257,6 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         body
     }
 
-    /// Testing a different implementation of [`CommitExt::generation_number`].
     #[instrument(level = "debug")]
     #[must_use]
     fn graph_stats(&self) -> GraphStats {
