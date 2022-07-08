@@ -336,44 +336,59 @@ impl Save {
         let log_env = env::var("RUST_LOG").unwrap_or_default();
 
         let rust_log = if self.verbose == 0 && self.quiet == 0 && !log_env.is_empty() {
-            log_env
+            if log_env.to_ascii_lowercase() == "off" {
+                None
+            } else {
+                Some(log_env)
+            }
         } else {
-            let verbosity_self = match default_verbosity_self + self.verbose - self.quiet {
-                i32::MIN..=0 => "off",
-                1 => "error",
-                2 => "warn",
-                3 => "info",
-                4 => "debug",
-                5..=i32::MAX => "trace",
-            };
-            let verbosity_other = match default_verbosity_other + self.verbose - self.quiet {
-                i32::MIN..=0 => "off",
-                1 => "error",
-                2 => "warn",
-                3 => "info",
-                4 => "debug",
-                5..=i32::MAX => "trace",
-            };
-            format!("{verbosity_other},save={verbosity_self}")
+            let verbosity_self = default_verbosity_self + self.verbose - self.quiet;
+            let verbosity_other = default_verbosity_other + self.verbose - self.quiet;
+            if verbosity_self <= 0 && verbosity_other <= 0 {
+                None
+            } else {
+                let verbosity_self = match verbosity_self {
+                    i32::MIN..=0 => "off",
+                    1 => "error",
+                    2 => "warn",
+                    3 => "info",
+                    4 => "debug",
+                    5..=i32::MAX => "trace",
+                };
+                let verbosity_other = match verbosity_other {
+                    i32::MIN..=0 => "off",
+                    1 => "error",
+                    2 => "warn",
+                    3 => "info",
+                    4 => "debug",
+                    5..=i32::MAX => "trace",
+                };
+                Some(format!("{verbosity_other},save={verbosity_self}"))
+            }
         };
 
-        let installed_tracing_subscriber = ::tracing_subscriber::util::SubscriberInitExt::try_init(
-            tracing_subscriber::Layer::with_subscriber(
-                ::tracing_error::ErrorLayer::default(),
-                ::tracing_subscriber::fmt()
-                    .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
-                    .with_target(false)
-                    .with_span_events(
-                        tracing_subscriber::fmt::format::FmtSpan::ENTER
-                            | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-                    )
-                    .compact()
-                    .finish(),
-            ),
-        );
+        if let Some(rust_log) = rust_log {
+            let installed_tracing_subscriber =
+                ::tracing_subscriber::util::SubscriberInitExt::try_init(
+                    tracing_subscriber::Layer::with_subscriber(
+                        ::tracing_error::ErrorLayer::default(),
+                        ::tracing_subscriber::fmt()
+                            .with_env_filter(::tracing_subscriber::EnvFilter::new(rust_log))
+                            .with_target(false)
+                            .with_span_events(
+                                tracing_subscriber::fmt::format::FmtSpan::ENTER
+                                    | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
+                            )
+                            .compact()
+                            .finish(),
+                    ),
+                );
 
-        if let Err(err) = installed_tracing_subscriber {
-            debug!("Failed to register global tracing_subscriber: {err}");
+            if let Err(err) = installed_tracing_subscriber {
+                debug!("Failed to register global tracing_subscriber: {err}");
+            }
+        } else {
+            // don't enable the tracing/logging systems at all if they won't emit anything
         }
 
         trace!("Running main with: {self:#?}");
