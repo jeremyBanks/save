@@ -136,12 +136,14 @@ pub struct Save {
     /// This supports some non-hex values with special meanings:
     ///
     /// - `_` is skipped, for a character whose value we don't care about.
-    /// - 'T' is replaced with the next nibble of the tree hash.
+    /// - 'C' is replaced by the next nibble of the minimum-timestamped-variant commit ID.
     /// - 'R' is replaced with the last digits of the revision index.
     /// - 'G' is replaced with the last digits of the generation index.
     /// - 'N' is replaced with the last digits of the commit index.
     ///
-    /// [default: "TTTT", representing the first four hex digits of the commit's tree hash]
+    /// May be explicitly set to an empty string to skip brute-forcing the hash.
+    ///
+    /// [default: "CCCC", representing the first four hex digits of the commit's tree hash]
     #[clap(
         help_heading = "COMMIT OPTIONS",
         long = "prefix",
@@ -526,7 +528,19 @@ pub fn main(args: Save) -> Result<()> {
     eprintln!();
 
     Command::new("git")
-        .args(&["--no-pager", "reflog", "-n", "4"])
+        .args(&[
+            "--no-pager",
+            "log",
+            "--name-status",
+            "--format=fuller",
+            "--date=human-local",
+            "--walk-reflogs",
+            "--all",
+            "--decorate",
+            "-n",
+            "2",
+            &commit.id().to_string(),
+        ])
         .status()?;
 
     eprintln!();
