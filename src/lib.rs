@@ -1,4 +1,6 @@
-#![doc = include_str!("../README.md")]
+//! ```text
+#![doc = include_str!("../README.txt")]
+//! ```
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(unsafe_code)]
 #![warn(
@@ -7,7 +9,6 @@
     macro_use_extern_crate,
     missing_copy_implementations,
     missing_debug_implementations,
-    missing_docs,
     non_ascii_idents,
     noop_method_call,
     single_use_lifetimes,
@@ -36,9 +37,6 @@
     clippy::match_same_arms,
     clippy::missing_const_for_fn,
     clippy::missing_enforced_import_renames,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::missing_safety_doc,
     clippy::module_name_repetitions,
     clippy::multiple_crate_versions,
     clippy::multiple_inherent_impl,
@@ -62,4 +60,13 @@
 )]
 
 pub mod cli;
+#[doc(hidden)]
+pub mod ez;
 pub mod git2;
+pub mod hex;
+pub mod testing;
+pub mod zigzag;
+#[doc(inline)]
+pub use self::ez::*;
+#[doc(inline)]
+pub use self::git2::{CommitExt, OidExt, RepositoryExt};

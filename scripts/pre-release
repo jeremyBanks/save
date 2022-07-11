@@ -1,9 +1,0 @@
-#!/bin/sh
-set -veuo pipefail
-
-cd "$(dirname "$0")/.."
-
-cargo clippy --fix --allow-dirty
-cargo +nightly fmt
-cargo test
-INSTALL_VERSION="$NEW_VERSION" scripts/readme

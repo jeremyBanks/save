@@ -1,3 +1,6 @@
-pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Ok(save::cli::main(save::cli::init())?)
+use {::clap::Parser, ::eyre::Report, ::save::cli::Save};
+
+fn main() -> Result<(), Report> {
+    ::color_eyre::install()?;
+    Save::parse().save()
 }

@@ -1,39 +1,33 @@
 //! Extending [`::git2`] (`libgit2`).
 
-#[allow(unused)]
-pub(self) use git2::{
-    Blob, Branch, Commit, Config, Index, Object, ObjectType, Oid, Reference, Remote, Repository,
-    Signature, Tag, Time, Tree,
-};
 use {
-    digest::{generic_array::GenericArray, Digest},
-    eyre::{Context, Result},
-    itertools::Itertools,
-    petgraph::{
-        graphmap::DiGraphMap,
-        visit::Topo,
-        EdgeDirection::{Incoming, Outgoing},
+    crate::zigzag::ZugZug,
+    std::borrow::BorrowMut,
+    ::{
+        core::{
+            borrow::Borrow,
+            fmt::Debug,
+            intrinsics::transmute,
+            ops::{Deref, DerefMut},
+        },
+        digest::{generic_array::GenericArray, typenum::U20, Digest},
+        eyre::{Context, Result},
+        git2::{Commit, ErrorCode, Index, ObjectType, Oid, Repository, Signature},
+        itertools::Itertools,
+        parking_lot::RwLock,
+        petgraph::{
+            graphmap::DiGraphMap,
+            visit::Topo,
+            EdgeDirection::{Incoming, Outgoing},
+        },
+        std::path::PathBuf,
+        tempfile::TempDir,
+        tracing::{debug, info, instrument, trace, warn},
     },
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
-    std::{
-        borrow::Borrow,
-        cell::RefCell,
-        cmp::max,
-        collections::{HashMap, HashSet},
-        fmt::Debug,
-        intrinsics::transmute,
-        ops::{Deref, DerefMut},
-        path::PathBuf,
-        rc::Rc,
-    },
-    tempfile::TempDir,
-    thousands::Separable,
-    tracing::{debug, debug_span, info, instrument, trace, warn},
-    typenum::U20,
 };
 
 /// Extension methods for [`Repository`].
-pub trait RepositoryExt: Borrow<Repository> {
+pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// Returns a Index with the current contents of the repository's working
     /// tree, as though everything inside of it had been committed on top of
     /// the current head. Submodules are skipped with a warning logged.
@@ -96,17 +90,79 @@ pub trait RepositoryExt: Borrow<Repository> {
     /// author of the current HEAD commit. If there *is* no HEAD commit, we
     /// fall back to a generic placeholder signature.
     fn signature_or_fallback(&self) -> Signature {
-        let _default_name = "dev";
-        let _default_email = "dev@localhost";
-
         let repo: &Repository = self.borrow();
-        let _signature = repo.signature();
 
-        todo!()
+        if let Ok(signature) = repo.signature() {
+            return signature;
+        }
+
+        let placeholder_name = "user";
+        let placeholder_email = "user@localhost";
+
+        let head = match self.borrow().head() {
+            Ok(head) => Some(head.peel_to_commit().unwrap()),
+            Err(err) if err.code() == ErrorCode::UnbornBranch => None,
+            Err(err) => {
+                panic!("Unexpected error from Git: {err:#?}");
+            },
+        };
+
+        let (user_name, user_email) = {
+            let config = self.borrow().config().unwrap();
+
+            let user_name: String = {
+                if let Ok(config_name) = config.get_string("user.name") {
+                    debug!("Using author name from Git configuration: {config_name:?}",);
+                    config_name
+                } else if let Some(previous_name) = head
+                    .as_ref()
+                    .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+                {
+                    info!("{previous_name}");
+                    previous_name
+                } else {
+                    warn!(
+                        "No author name found, falling back to placeholder: {placeholder_name:?}",
+                    );
+                    placeholder_name.to_string()
+                }
+            };
+
+            let user_email: String = if let Ok(config_email) = config.get_string("user.email") {
+                debug!(
+                    "Using author email from Git configuration: {:?}",
+                    &config_email
+                );
+                config_email
+            } else if let Some(previous_email) = head
+                .as_ref()
+                .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+            {
+                info!(
+                    "Using author email from previous commit: {:?}",
+                    &previous_email
+                );
+                previous_email
+            } else {
+                warn!(
+                    "No author email found, falling back to placeholder: {:?}",
+                    &placeholder_email
+                );
+                placeholder_email.to_string()
+            };
+
+            (user_name, user_email)
+        };
+
+        // let signature = self.borrow().signature();
+
+        todo!();
     }
 
     /// Saves all changes in the working directory to this repository using
-    /// insensible defaults.
+    /// sensible defaults.
+    ///
+    /// This is equivalent to running the `save` CLI command wih no arguments.
     ///
     /// # Errors
     ///
@@ -119,14 +175,21 @@ pub trait RepositoryExt: Borrow<Repository> {
         let tree = repo.find_tree(tree)?;
         let head = repo.head()?.peel_to_commit()?;
         let signature = repo.signature_or_fallback();
-        let message = "hmm";
+        let message = "hmm"; // XXX: ???
         let commit = repo.commit(None, &signature, &signature, message, &tree, &[&head])?;
         let commit = repo.find_commit(commit)?;
         Ok(commit)
     }
 }
 
-impl<T> RepositoryExt for T where T: Borrow<Repository> {}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GraphStats {
+    pub revision_index: u32,
+    pub generation_index: u32,
+    pub commit_index: u32,
+}
+
+impl RepositoryExt for Repository {}
 
 /// A [`Repository`] in a temporary directory.
 ///
@@ -194,134 +257,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         body
     }
 
-    /// Finds the generation number of this commit.
-    ///
-    /// The generation index is the number of edges of the longest path between
-    /// the given commit and an initial commit (one with no parents, which
-    /// has an implicit generation index of 0). The Git documentation also
-    /// refers to this as the "topological level" of a commit
-    /// (<https://git-scm.com/docs/commit-graph>).
     #[instrument(level = "debug")]
     #[must_use]
-    fn generation_number(&self) -> u32 {
-        let commit: &Commit = self.borrow();
-        let head = commit.clone();
-
-        #[derive(Debug, Clone)]
-        struct CommitNode {
-            /// Number of edges (Git children) whose distances hasn't been
-            /// accounted-for yet.
-            unaccounted_edges_in: u32,
-            /// Max distance from head of accounted-for edges.
-            max_distance_from_head: u32,
-            /// Git parents of this node.
-            edges_out: Vec<Rc<RefCell<CommitNode>>>,
-        }
-
-        let (root, _leaves) = {
-            let span = debug_span!("load_git_graph");
-            let _guard = span.enter();
-
-            let mut all_commits = HashMap::<Oid, Rc<RefCell<CommitNode>>>::new();
-            let mut initial_commits = vec![];
-
-            #[derive(Debug, Clone)]
-            struct CommitWalking<'repo> {
-                commit: Commit<'repo>,
-                from: Option<Rc<RefCell<CommitNode>>>,
-            }
-
-            let mut walks = vec![CommitWalking {
-                commit: head.clone(),
-                from: None,
-            }];
-
-            while let Some(CommitWalking { commit, from }) = walks.pop() {
-                let from = &from;
-                all_commits
-                    .entry(commit.id())
-                    .and_modify(|node| {
-                        if let Some(from) = from {
-                            from.borrow_mut().edges_out.push(Rc::clone(node));
-                            node.borrow_mut().unaccounted_edges_in += 1;
-                        }
-                    })
-                    .or_insert_with(|| {
-                        let node = Rc::new(RefCell::new(CommitNode {
-                            edges_out: vec![],
-                            unaccounted_edges_in: 1,
-                            max_distance_from_head: 0,
-                        }));
-
-                        if let Some(from) = from {
-                            from.borrow_mut().edges_out.push(Rc::clone(&node));
-                        }
-
-                        if commit.parents().len() == 0 {
-                            debug!("Found an initial commit: {:?}", commit);
-                            initial_commits.push(Rc::clone(&node));
-                        } else {
-                            for parent in commit.parents() {
-                                walks.push(CommitWalking {
-                                    commit: parent,
-                                    from: Some(Rc::clone(&node)),
-                                });
-                            }
-                        }
-
-                        node
-                    });
-            }
-
-            info!(
-                "Loaded {} commits, containing {} initial commits.",
-                all_commits.len().separate_with_underscores(),
-                initial_commits.len(),
-            );
-
-            let head = Rc::clone(all_commits.get(&head.id()).unwrap());
-            (head, initial_commits)
-        };
-
-        let generation_number = {
-            let span = debug_span!("measure_git_graph");
-            let _guard = span.enter();
-
-            let mut generation_number = 0;
-
-            let mut live = vec![root];
-
-            while let Some(commit) = live.pop() {
-                let commit = commit.borrow_mut();
-
-                if commit.edges_out.is_empty() {
-                    generation_number = max(generation_number, commit.max_distance_from_head);
-                } else {
-                    for parent in commit.edges_out.iter() {
-                        let mut parent_mut = parent.borrow_mut();
-                        parent_mut.max_distance_from_head = max(
-                            parent_mut.max_distance_from_head,
-                            commit.max_distance_from_head + 1,
-                        );
-                        parent_mut.unaccounted_edges_in -= 1;
-
-                        if parent_mut.unaccounted_edges_in == 0 {
-                            live.push(Rc::clone(parent));
-                        }
-                    }
-                }
-            }
-
-            generation_number
-        };
-
-        generation_number
-    }
-
-    /// Testing a different implementation of [`CommitExt::generation_number`].
-    #[instrument(level = "debug")]
-    #[must_use]
-    fn generation_number_via_petgraph(&self) -> u32 {
+    fn graph_stats(&self) -> GraphStats {
         let commit: &Commit = self.borrow();
 
         // Git commit graph as petgraph:
@@ -349,8 +287,9 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             }
         }
 
-        info!(
-            "Constructed graph with {} nodes and {} edges",
+        debug!(
+            "Loaded commit graph with {} nodes (commits) and {} edges (parent references of \
+             commits)",
             graph.node_count(),
             graph.edge_count()
         );
@@ -379,7 +318,23 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             }
         }
 
-        global_maximum_weight
+        let commit_index: u32 = (graph.node_count() - 1).try_into().unwrap();
+        let generation_index = global_maximum_weight;
+        let revision_index = {
+            let mut revision_index = 0;
+            let mut commit: Commit = self.borrow().clone();
+            while let Some(parent) = commit.parents().next() {
+                revision_index += 1;
+                commit = parent;
+            }
+            revision_index
+        };
+
+        GraphStats {
+            revision_index,
+            generation_index,
+            commit_index,
+        }
     }
 
     /// Returns a new [`Commit`] with the result of squashing this [`Commit`]
@@ -393,7 +348,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             return commit.clone();
         }
 
-        let _merged_commits: HashSet<Oid> = [commit.id()].into();
+        // let _merged_commits: HashSet<Oid> = [commit.id()].into();
 
         // let mut tail: Commit = commit.clone();
         // for _ in 0..depth {
@@ -401,7 +356,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         //     merged_commits.insert(first_parent.id());
         //     tail = first_parent;
 
-        //     // we need to collect all of the non-first parents, and walk all of
+        //     // we need to collect all of the non-first parents, and walk all
         //     // their ancestors to see if they're merged in or not
         // }
 
@@ -434,17 +389,30 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         &self,
         repo: &'repo Repository,
         target_prefix: &[u8],
+        target_mask: Option<&[u8]>,
         min_timestamp: impl Into<Option<i64>>,
-        max_timestamp: impl Into<Option<i64>>,
-    ) -> BruteForcedCommit<'repo> {
+        target_timestamp: impl Into<Option<i64>>,
+    ) -> Commit<'repo> {
+        let target_prefix = target_prefix.to_vec();
+        let target_mask = target_mask
+            .unwrap_or({
+                static DEFAULT: &[u8] = &[0xFF; 20];
+                &DEFAULT[..target_prefix.len().min(DEFAULT.len())]
+            })
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        trace!("Brute forcing a timestamp for {target_prefix:2x?} with mask {target_mask:2x?}");
+
+        let thread_count = num_cpus::get() as u64;
+        trace!("Using {thread_count} threads");
+
         let commit = self.borrow();
         let min_timestamp = min_timestamp
             .into()
-            .unwrap_or_else(|| commit.author().when().seconds());
+            .unwrap_or_else(|| commit.committer().when().seconds());
 
-        // TODO: actually short-circuit on full matches so this isn't always an infinite
-        // loop
-        let max_timestamp = max_timestamp.into().unwrap_or(i64::MAX);
+        let target_timestamp = target_timestamp.into().unwrap_or(min_timestamp);
 
         let base_commit = String::from_utf8(self.to_bytes()).unwrap();
 
@@ -484,37 +452,95 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             commit_lines.join("\n")
         };
 
-        let (_best_score, best_committer_timestamp, best_author_timestamp, best_oid, best_body) =
-            ((min_timestamp..=max_timestamp)
-                .into_par_iter()
-                .map(|author_timestamp| {
-                    (author_timestamp..=max_timestamp)
-                        .into_par_iter()
-                        .map(|committer_timestamp| {
-                            let candidate_body =
-                                commit_create_buffer(author_timestamp, committer_timestamp);
-                            let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
+        let best: RwLock<Option<Best>> = RwLock::new(None);
+        struct Best {
+            index: u64,
+            body: String,
+            oid: Oid,
+            author_timestamp: i64,
+            committer_timestamp: i64,
+        }
 
-                            let score = candidate_oid
-                                .as_bytes()
-                                .iter()
-                                .zip(target_prefix.iter())
-                                .map(|(a, b)| (a ^ b))
-                                .collect::<Vec<u8>>();
+        let target_timestamp = target_timestamp;
+        let min_timestamp = min_timestamp;
 
-                            (
-                                score,
-                                committer_timestamp,
-                                author_timestamp,
-                                candidate_oid,
-                                candidate_body,
-                            )
-                        })
-                        .min()
-                        .unwrap()
-                }))
-            .min()
-            .unwrap();
+        let target_mask = &target_mask;
+        let target_prefix = &target_prefix;
+
+        std::thread::scope(|scope| {
+            let best = &best;
+            let mut threads = Vec::new();
+
+            for thread_index in 0..thread_count {
+                threads.push(scope.spawn(move || {
+                    trace!("Starting thread {thread_index}.");
+                    for local_index in 0_u64.. {
+                        let index = local_index * thread_count + thread_index;
+                        if local_index % 32 == thread_index % 32 {
+                            if let Some(ref best) = *best.read() {
+                                let best_index = best.index;
+                                if best_index < index {
+                                    trace!(
+                                        "Ending thread {thread_index} at {index} as it's past the \
+                                         current best index: {best_index}"
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+
+                        let (d_author, d_committer) = index.zugzug();
+
+                        let author_timestamp = target_timestamp + d_author;
+                        let committer_timestamp = target_timestamp + d_committer;
+
+                        if author_timestamp < min_timestamp {
+                            continue;
+                        }
+
+                        let candidate_body =
+                            commit_create_buffer(author_timestamp, committer_timestamp);
+
+                        let candidate_oid = Oid::for_object("commit", candidate_body.as_ref());
+
+                        if candidate_oid
+                            .as_bytes()
+                            .iter()
+                            .zip(target_prefix.iter())
+                            .map(|(a, b)| (a ^ b))
+                            .zip(target_mask.iter())
+                            .map(|(x, mask)| x & *mask)
+                            .all(|x| x == 0)
+                        {
+                            let mut best = best.write();
+                            if best.is_none() || index < best.as_ref().unwrap().index {
+                                *best = Some(Best {
+                                    index,
+                                    author_timestamp,
+                                    committer_timestamp,
+                                    body: candidate_body,
+                                    oid: candidate_oid,
+                                });
+                                trace!(
+                                    "Ending thread {thread_index} with a new best hit index: \
+                                     {index}"
+                                );
+                            } else {
+                                let best_index = best.as_ref().unwrap().index;
+                                trace!(
+                                    "Ending {thread_index} with a hit at {index}, but that's \
+                                     worse than the current best: {best_index}"
+                                );
+                            }
+
+                            break;
+                        }
+                    }
+                }));
+            }
+        });
+
+        let best = best.into_inner().unwrap();
 
         let brute_forced_commit_oid = commit
             .amend(
@@ -523,7 +549,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                     commit.author().name().unwrap(),
                     commit.author().email().unwrap(),
                     &git2::Time::new(
-                        best_author_timestamp,
+                        best.author_timestamp,
                         commit.author().when().offset_minutes(),
                     ),
                 )
@@ -533,7 +559,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                     commit.committer().name().unwrap(),
                     commit.committer().email().unwrap(),
                     &git2::Time::new(
-                        best_committer_timestamp,
+                        best.committer_timestamp,
                         commit.committer().when().offset_minutes(),
                     ),
                 )
@@ -544,90 +570,16 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                 None,
             )
             .unwrap();
-        assert_eq!(best_oid, brute_forced_commit_oid);
+        assert_eq!(best.oid, brute_forced_commit_oid);
 
         let brute_forced_commit = repo.find_commit(brute_forced_commit_oid).unwrap();
-        assert_eq!(best_body.as_bytes(), brute_forced_commit.to_bytes());
+        assert_eq!(best.body.as_bytes(), brute_forced_commit.to_bytes());
 
-        if best_oid.as_bytes().starts_with(target_prefix) {
-            debug!("Brute-forced a complete prefix match: {best_oid} for {target_prefix:02x?}");
-            BruteForcedCommit::Complete {
-                commit: brute_forced_commit,
-            }
-        } else {
-            debug!("Brute-forced a partial prefix match: {best_oid} for {target_prefix:02x?}");
-            BruteForcedCommit::Incomplete {
-                commit: brute_forced_commit,
-            }
-        }
+        brute_forced_commit
     }
 }
 
-impl<'repo, T> CommitExt<'repo> for T where T: Borrow<Commit<'repo>> + Debug {}
-
-/// The commit resulting from a [`CommitExt::brute_force_timestamps`] call,
-/// wrapped to indicate whether the target prefix was complete or incompletely
-/// matched.
-#[derive(Debug, Clone)]
-#[must_use]
-pub enum BruteForcedCommit<'repo> {
-    /// The specified `target_prefix` was entirely matched.
-    Complete {
-        /// The resulting commit.
-        commit: Commit<'repo>,
-    },
-    /// The specified `target_prefix` was not entirely matched.
-    Incomplete {
-        /// The resulting commit.
-        commit: Commit<'repo>,
-    },
-}
-
-impl<'repo> Borrow<Commit<'repo>> for BruteForcedCommit<'repo> {
-    fn borrow(&self) -> &Commit<'repo> {
-        self.commit()
-    }
-}
-
-impl<'repo> From<BruteForcedCommit<'repo>> for Commit<'repo> {
-    fn from(commit: BruteForcedCommit<'repo>) -> Self {
-        match commit {
-            BruteForcedCommit::Complete { commit, .. }
-            | BruteForcedCommit::Incomplete { commit, .. } => commit,
-        }
-    }
-}
-
-impl<'repo> BruteForcedCommit<'repo> {
-    /// Returns a reference to the underlying [`Commit`].
-    #[must_use]
-    pub const fn commit(&self) -> &Commit<'repo> {
-        match self {
-            BruteForcedCommit::Complete { commit, .. }
-            | BruteForcedCommit::Incomplete { commit, .. } => commit,
-        }
-    }
-
-    /// Returns a reference to the underlying [`Commit`] if it is a complete
-    /// match.
-    #[must_use]
-    pub const fn complete(&self) -> Option<&Commit<'repo>> {
-        match self {
-            BruteForcedCommit::Complete { commit, .. } => Some(commit),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the underlying [`Commit`] if it is not a complete
-    /// match.
-    #[must_use]
-    pub const fn incomplete(&self) -> Option<&Commit<'repo>> {
-        match self {
-            BruteForcedCommit::Incomplete { commit, .. } => Some(commit),
-            _ => None,
-        }
-    }
-}
+impl<'repo> CommitExt<'repo> for Commit<'repo> {}
 
 /// Extension methods for [`Oid`].
 pub trait OidExt: Borrow<Oid> + Debug {
@@ -669,4 +621,4 @@ pub trait OidExt: Borrow<Oid> + Debug {
     }
 }
 
-impl<T> OidExt for T where T: Borrow<Oid> + Debug {}
+impl OidExt for Oid {}
