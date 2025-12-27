@@ -5,6 +5,7 @@ use ::{
     std::{
         collections::HashMap,
         env, fs,
+        panic::resume_unwind,
         path::{Path, PathBuf},
         sync::Mutex,
     },
@@ -14,7 +15,7 @@ use ::{
 //
 #[track_caller]
 fn assert_eq<Literal: self::Literal>(expected: Literal, actual: Literal) {
-    assert!(Expected::from_caller() == actual)
+    assert!(Expected::from_caller() == actual);
     assert_eq!(expected, actual);
 }
 
@@ -69,7 +70,7 @@ pub enum ExpectedLocation {
 }
 
 #[track_caller]
-pub fn assert_debug_eq(expected: impl expect_test::ExpectedData, actual: impl ::core::fmt::Debug) {
+pub fn assert_debug_eq(expected: &'static str, actual: impl ::core::fmt::Debug) {
     expect(expected).assert_eq(&format!("{actual:?}"));
 }
 
@@ -82,7 +83,9 @@ fn update_expect() -> bool {
     env::var("SAVE_EXPECTATIONS").is_ok() || env::var("UPDATE_EXPECT").is_ok()
 }
 
-
+const HELP: &str = "
+To update expectations, set SAVE_EXPECTATIONS=1 or UPDATE_EXPECT=1 environment variable.
+";
 
 #[track_caller]
 pub fn expect(data: &'static str) -> Expect {
@@ -93,7 +96,7 @@ pub fn expect(data: &'static str) -> Expect {
             line: location.line(),
             column: location.column(),
         },
-        data: data.str(),
+        data: data,
         indent: true,
     }
 }
@@ -438,7 +441,7 @@ impl Runtime {
             format_chunks(diff)
         );
         // Use resume_unwind instead of panic!() to prevent a backtrace, which is unnecessary noise.
-        panic::resume_unwind(Box::new(()));
+        resume_unwind(Box::new(()));
     }
 }
 
