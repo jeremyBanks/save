@@ -12,12 +12,13 @@ use ::{
 };
 
 //
-//
-#[track_caller]
-fn assert_eq<Literal: self::Literal>(expected: Literal, actual: Literal) {
-    assert!(Expected::from_caller() == actual);
-    assert_eq!(expected, actual);
-}
+// Note: Custom assert_eq and Expected types appear to be unfinished experimental code
+// Commenting out until/unless needed
+// #[track_caller]
+// fn assert_eq<Literal: self::Literal>(expected: Literal, actual: Literal) {
+//     assert!(Expected::from_caller() == actual);
+//     assert_eq!(expected, actual);
+// }
 
 pub trait Literal: Clone + Debug + Copy + PartialEq {}
 
