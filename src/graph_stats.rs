@@ -78,14 +78,14 @@ pub trait CommitView: Clone + Debug {
 }
 
 /// Abstract interface for repository operations needed by the algorithm.
-pub trait RepositoryView {
-    type Commit: CommitView;
+pub trait RepositoryView<'repo> {
+    type Commit: CommitView + 'repo;
 
     /// Check if this is a shallow clone.
     fn is_shallow(&self) -> bool;
 
     /// Find a commit by its ID.
-    fn find_commit(&self, id: <Self::Commit as CommitView>::Id) -> Option<Self::Commit>;
+    fn find_commit(&'repo self, id: <Self::Commit as CommitView>::Id) -> Option<Self::Commit>;
 
     /// Validate that a tree prefix matches the actual tree ID.
     /// This is used to verify parsed commit messages.
@@ -155,7 +155,7 @@ impl MessageParser {
     /// Returns true if the message can be trusted based on:
     /// - Tree hash matches (if present in message)
     /// - Prefix matches repository state (s only in shallow repos)
-    pub fn validate<R: RepositoryView>(
+    pub fn validate<'repo, R: RepositoryView<'repo>>(
         repo: &R,
         commit: &R::Commit,
         message: &str,
@@ -182,12 +182,13 @@ impl MessageParser {
 }
 
 /// Calculator for graph statistics with z-mode support.
-pub struct GraphStatsCalculator<'a, R: RepositoryView> {
+pub struct GraphStatsCalculator<'repo, 'a: 'repo, R: RepositoryView<'repo>> {
     repo: &'a R,
     max_depth: i32,
+    _phantom: std::marker::PhantomData<&'repo ()>,
 }
 
-impl<'a, R: RepositoryView> Debug for GraphStatsCalculator<'a, R> {
+impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> Debug for GraphStatsCalculator<'repo, 'a, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GraphStatsCalculator")
             .field("max_depth", &self.max_depth)
@@ -195,9 +196,13 @@ impl<'a, R: RepositoryView> Debug for GraphStatsCalculator<'a, R> {
     }
 }
 
-impl<'a, R: RepositoryView> GraphStatsCalculator<'a, R> {
+impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a, R> {
     pub fn new(repo: &'a R, max_depth: i32) -> Self {
-        Self { repo, max_depth }
+        Self {
+            repo,
+            max_depth,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Calculate graph statistics for a commit.

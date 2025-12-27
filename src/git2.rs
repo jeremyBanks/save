@@ -1,7 +1,10 @@
 //! Extending [`::git2`] (`libgit2`).
 
 use {
-    crate::zigzag::ZugZug,
+    crate::{
+        graph_stats::{CommitView, RepositoryView},
+        zigzag::ZugZug,
+    },
     std::borrow::BorrowMut,
     ::{
         core::{
@@ -762,3 +765,49 @@ pub trait OidExt: Borrow<Oid> + Debug {
 }
 
 impl OidExt for Oid {}
+
+// Implementations of graph_stats traits for git2 types
+
+impl CommitView for Commit<'_> {
+    type Id = Oid;
+
+    fn id(&self) -> Self::Id {
+        Commit::id(self)
+    }
+
+    fn parent_ids(&self) -> Vec<Self::Id> {
+        (0..self.parent_count())
+            .filter_map(|i| self.parent_id(i).ok())
+            .collect()
+    }
+
+    fn summary(&self) -> Option<String> {
+        Commit::summary(self).map(String::from)
+    }
+
+    fn tree_id(&self) -> Self::Id {
+        self.tree_id()
+    }
+
+    fn id_bytes(&self) -> Vec<u8> {
+        self.id().as_bytes().to_vec()
+    }
+}
+
+impl<'repo> RepositoryView<'repo> for Repository {
+    type Commit = Commit<'repo>;
+
+    fn is_shallow(&self) -> bool {
+        Repository::is_shallow(self)
+    }
+
+    fn find_commit(&'repo self, id: Oid) -> Option<Self::Commit> {
+        self.find_commit(id).ok()
+    }
+
+    fn validate_tree_prefix(&self, tree_id: &Oid, prefix: &str) -> bool {
+        let tree_hex = format!("{}", tree_id);
+        let tree_prefix = tree_hex[..prefix.len().min(tree_hex.len())].to_uppercase();
+        tree_prefix == prefix.to_uppercase()
+    }
+}
