@@ -63,6 +63,7 @@ pub mod cli;
 #[doc(hidden)]
 pub mod ez;
 pub mod git2;
+pub mod graph_stats;
 pub mod hex;
 pub mod testing;
 pub mod zigzag;
