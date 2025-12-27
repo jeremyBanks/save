@@ -9,6 +9,7 @@
 //! The algorithm supports depth-limited scanning ("z-mode") to bound complexity
 //! in large repositories.
 
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -182,6 +183,14 @@ pub struct GraphStatsCalculator<'a, R: RepositoryView> {
     max_depth: i32,
 }
 
+impl<'a, R: RepositoryView> Debug for GraphStatsCalculator<'a, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GraphStatsCalculator")
+            .field("max_depth", &self.max_depth)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'a, R: RepositoryView> GraphStatsCalculator<'a, R> {
     pub fn new(repo: &'a R, max_depth: i32) -> Self {
         Self { repo, max_depth }
@@ -196,10 +205,206 @@ impl<'a, R: RepositoryView> GraphStatsCalculator<'a, R> {
     /// 4. If ANY path hits depth limit: enter z-mode
     /// 5. Retrospectively trust collected z commits
     /// 6. For paths with no valid commit: declare z0
-    pub fn calculate(&self, _head: &R::Commit) -> GraphStats {
-        // TODO: Implement the full z-mode algorithm
-        // For now, return default to allow the code to compile
-        GraphStats::default()
+    pub fn calculate(&self, head: &R::Commit) -> GraphStats {
+        let is_shallow = self.repo.is_shallow();
+        let unlimited_depth = self.max_depth < 0;
+
+        // Special case: if max_depth is 0, we can't scan anything
+        if self.max_depth == 0 {
+            return GraphStats {
+                revision_index: 0,
+                generation_index: 0,
+                commit_index: 0,
+                origin: None,
+                z_mode: true,
+            };
+        }
+
+        // Try to optimize: if head has single parent with trusted message, use it
+        let parent_ids = head.parent_ids();
+        if parent_ids.len() == 1 && unlimited_depth {
+            if let Some(parent) = self.repo.find_commit(parent_ids[0].clone()) {
+                if let Some(summary) = parent.summary() {
+                    if let Some(parsed) = MessageParser::parse(&summary) {
+                        if MessageParser::validate(self.repo, &parent, &summary, &parsed) {
+                            // Check if we can trust this prefix
+                            let trusted = match parsed.prefix {
+                                MessagePrefix::Regular if !is_shallow => true,
+                                MessagePrefix::Shallow if is_shallow => true,
+                                _ => false,
+                            };
+
+                            if trusted {
+                                // Inherit stats from parent, increment indices
+                                let generation_index = parsed.generation_index
+                                    .unwrap_or(parsed.revision_index) + 1;
+                                let commit_index = parsed.commit_index
+                                    .unwrap_or_else(|| parsed.generation_index.unwrap_or(parsed.revision_index)) + 1;
+
+                                return GraphStats {
+                                    revision_index: parsed.revision_index + 1,
+                                    generation_index,
+                                    commit_index,
+                                    origin: parsed.origin,
+                                    z_mode: false,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fall back to full graph walk
+        // For now, just return a basic implementation
+        // TODO: Implement full z-mode algorithm with per-path scanning
+        self.full_graph_walk(head, is_shallow, unlimited_depth)
+    }
+
+    fn full_graph_walk(&self, head: &R::Commit, _is_shallow: bool, _unlimited_depth: bool) -> GraphStats {
+        // Build a complete graph using BFS
+        let mut visited = HashSet::new();
+        let mut queue = vec![head.id()];
+        let mut commit_map: HashMap<_, R::Commit> = HashMap::new();
+        let mut parent_map: HashMap<_, Vec<_>> = HashMap::new();
+
+        visited.insert(head.id());
+        commit_map.insert(head.id(), head.clone());
+
+        while let Some(id) = queue.pop() {
+            if let Some(commit) = commit_map.get(&id) {
+                let parents = commit.parent_ids();
+                parent_map.insert(id.clone(), parents.clone());
+
+                for parent_id in parents {
+                    if visited.insert(parent_id.clone()) {
+                        if let Some(parent) = self.repo.find_commit(parent_id.clone()) {
+                            commit_map.insert(parent_id.clone(), parent);
+                            queue.push(parent_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Calculate revision_index (first-parent chain length)
+        let revision_index = {
+            let mut count = 0;
+            let mut current_id = head.id();
+            while let Some(parents) = parent_map.get(&current_id) {
+                if parents.is_empty() {
+                    break;
+                }
+                count += 1;
+                current_id = parents[0].clone();
+            }
+            count
+        };
+
+        // Calculate generation_index (max distance from any root)
+        let generation_index = self.calculate_generation(&parent_map, &head.id());
+
+        // Calculate commit_index (total commits - 1)
+        let commit_index = visited.len().saturating_sub(1) as u32;
+
+        // Calculate origin
+        let origin = if revision_index == 0 {
+            None
+        } else {
+            self.calculate_origin(&parent_map, &commit_map)
+        };
+
+        GraphStats {
+            revision_index,
+            generation_index,
+            commit_index,
+            origin,
+            z_mode: false,
+        }
+    }
+
+    fn calculate_generation(
+        &self,
+        parent_map: &HashMap<<R::Commit as CommitView>::Id, Vec<<R::Commit as CommitView>::Id>>,
+        head_id: &<R::Commit as CommitView>::Id,
+    ) -> u32 {
+        let mut distances = HashMap::new();
+
+        // Initialize: roots have distance 0
+        for (id, parents) in parent_map {
+            if parents.is_empty() {
+                distances.insert(id.clone(), 0);
+            }
+        }
+
+        // Process in reverse topological order
+        let mut processed = HashSet::new();
+        let mut max_distance = 0;
+
+        fn visit<Id: Clone + Eq + Hash + Ord + Debug>(
+            id: &Id,
+            parent_map: &HashMap<Id, Vec<Id>>,
+            distances: &mut HashMap<Id, u32>,
+            processed: &mut HashSet<Id>,
+            max_distance: &mut u32,
+        ) -> u32 {
+            if let Some(&dist) = distances.get(id) {
+                return dist;
+            }
+
+            if !processed.insert(id.clone()) {
+                // Cycle detection (shouldn't happen in git)
+                return 0;
+            }
+
+            let parents = parent_map.get(id).map(|p| p.as_slice()).unwrap_or(&[]);
+            let max_parent_dist = parents
+                .iter()
+                .map(|p| visit(p, parent_map, distances, processed, max_distance))
+                .max()
+                .unwrap_or(0);
+
+            let dist = max_parent_dist + 1;
+            distances.insert(id.clone(), dist);
+            if dist > *max_distance {
+                *max_distance = dist;
+            }
+            dist
+        }
+
+        visit(head_id, parent_map, &mut distances, &mut processed, &mut max_distance);
+        max_distance
+    }
+
+    fn calculate_origin(
+        &self,
+        parent_map: &HashMap<<R::Commit as CommitView>::Id, Vec<<R::Commit as CommitView>::Id>>,
+        commit_map: &HashMap<<R::Commit as CommitView>::Id, R::Commit>,
+    ) -> Option<u16> {
+        // Find all root commits
+        let mut roots: Vec<_> = parent_map
+            .iter()
+            .filter(|(_, parents)| parents.is_empty())
+            .filter_map(|(id, _)| commit_map.get(id))
+            .collect();
+
+        if roots.is_empty() {
+            return None;
+        }
+
+        roots.sort_by_key(|c| c.id());
+
+        if roots.len() == 1 {
+            // Single root: use last 2 bytes of its ID
+            // We need to extract bytes from the ID somehow
+            // For now, return a placeholder
+            // TODO: This needs to be implemented properly
+            Some(0x0000)
+        } else {
+            // Multiple roots: hash them together
+            // TODO: This needs proper implementation
+            Some(0x0000)
+        }
     }
 }
 
