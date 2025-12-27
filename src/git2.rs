@@ -318,7 +318,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             }
         }
 
-        let commit_index: u32 = (graph.node_count() - 1).try_into().unwrap();
+        let commit_index: u32 = graph.node_count().saturating_sub(1).try_into().unwrap();
         let generation_index = global_maximum_weight;
         let revision_index = {
             let mut revision_index = 0;

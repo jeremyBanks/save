@@ -498,12 +498,21 @@ pub fn main(args: Save) -> Result<()> {
     debug!("Prepared commit {}", commit.id());
 
     if !args.no_head {
-        let mut head_ref = repo.head()?;
-        info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
-        if head_ref.is_branch() {
-            head_ref.set_target(commit.id(), "committed via save")?;
-        } else {
-            repo.set_head(&commit.id().to_string())?;
+        match repo.head() {
+            Ok(mut head_ref) => {
+                info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
+                if head_ref.is_branch() {
+                    head_ref.set_target(commit.id(), "committed via save")?;
+                } else {
+                    repo.set_head(&commit.id().to_string())?;
+                }
+            }
+            Err(err) if err.code() == ErrorCode::UnbornBranch => {
+                // First commit on unborn branch - set HEAD to point to the new commit
+                info!("Creating first commit on unborn branch");
+                repo.set_head_detached(commit.id())?;
+            }
+            Err(err) => return Err(err.into()),
         }
     } else {
         info!("Not updating HEAD because this is a dry run.");
