@@ -26,8 +26,23 @@ When running `save` in a shallow clone:
    - revision_index = 0 (no first-parent chain beyond shallow boundary)
    - generation_index = 0 (same as revision, omitted from message)
    - commit_index = 0 (1 node in graph, minus 1)
+   - Shallow boundary: 1 commit
+   - Total reachable: 1 commit
 
-3. **Example - Full Repository**:
+3. **Example - Depth 10 Clone**:
+   ```
+   $ git clone --depth 10 https://github.com/torvalds/linux.git
+   $ save --all --no-head
+
+   Commit message: r9 / g15 / n71 / x0430
+   ```
+   - revision_index = 9 (first-parent chain length)
+   - generation_index = 15 (different due to merge history!)
+   - commit_index = 71 (72 nodes in graph, minus 1)
+   - Shallow boundary: 16 commits (more than depth due to merges)
+   - Total reachable: 72 commits
+
+4. **Example - Full Repository**:
    ```
    $ save --all --no-head
 
