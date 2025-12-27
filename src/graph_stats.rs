@@ -299,16 +299,11 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
                 let parents = commit.parent_ids();
 
                 // Check if we should continue scanning from this commit
-                let should_continue = if depth >= max_depth {
-                    // Hit depth limit on this path
-                    hit_depth_limit = true;
-                    boundary_commits.insert(id.clone());
-                    false
-                } else if depth == 0 {
+                let should_continue = if depth == 0 {
                     // Never check trust for HEAD itself - we're calculating for the commit ON TOP of it
                     true
                 } else {
-                    // Check if this commit has a trusted message (depth > 0)
+                    // For depth > 0, check trust first, then depth limit
                     let has_trusted = if let Some(summary) = commit.summary() {
                         if let Some(parsed) = MessageParser::parse(&summary) {
                             if MessageParser::validate(self.repo, &commit, &summary, &parsed) {
@@ -335,9 +330,18 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
                     };
 
                     if has_trusted {
+                        // Found trusted commit, stop here
                         boundary_commits.insert(id.clone());
+                        false
+                    } else if depth >= max_depth {
+                        // Hit depth limit without finding trusted commit
+                        hit_depth_limit = true;
+                        boundary_commits.insert(id.clone());
+                        false
+                    } else {
+                        // Not trusted and haven't hit depth limit, keep scanning
+                        true
                     }
-                    !has_trusted // Continue if not trusted
                 };
 
                 // Store parent info for ALL visited commits
