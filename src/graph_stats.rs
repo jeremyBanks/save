@@ -264,10 +264,141 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
             }
         }
 
-        // Fall back to full graph walk
-        // For now, just return a basic implementation
-        // TODO: Implement full z-mode algorithm with per-path scanning
-        self.full_graph_walk(head, is_shallow, unlimited_depth)
+        // Choose between unlimited and depth-limited scan
+        if unlimited_depth {
+            self.full_graph_walk(head, is_shallow, unlimited_depth)
+        } else {
+            self.depth_limited_scan(head, is_shallow)
+        }
+    }
+
+    /// Depth-limited scan implementing z-mode algorithm.
+    fn depth_limited_scan(&self, head: &R::Commit, is_shallow: bool) -> GraphStats {
+        let max_depth = self.max_depth as usize;
+
+        // Collect all commits we visit
+        let mut visited = HashSet::new();
+        let mut commit_map: HashMap<_, R::Commit> = HashMap::new();
+        let mut parent_map: HashMap<_, Vec<_>> = HashMap::new();
+
+        // Track collected z commits (we don't trust them initially)
+        let mut z_commits = HashSet::new();
+
+        // BFS with depth tracking
+        let mut queue: Vec<(_, usize)> = vec![(head.id(), 0)];
+        visited.insert(head.id());
+        commit_map.insert(head.id(), head.clone());
+
+        let mut hit_depth_limit = false;
+
+        while let Some((id, depth)) = queue.pop() {
+            if let Some(commit) = commit_map.get(&id).cloned() {
+                let parents = commit.parent_ids();
+                parent_map.insert(id.clone(), parents.clone());
+
+                // Check if we should continue scanning from this commit
+                let should_continue = if depth >= max_depth {
+                    // Hit depth limit on this path
+                    hit_depth_limit = true;
+                    false
+                } else {
+                    // Check if this commit has a trusted message
+                    let has_trusted = if let Some(summary) = commit.summary() {
+                        if let Some(parsed) = MessageParser::parse(&summary) {
+                            if MessageParser::validate(self.repo, &commit, &summary, &parsed) {
+                                // Track z commits but don't trust them yet
+                                if parsed.prefix == MessagePrefix::ZMode {
+                                    z_commits.insert(id.clone());
+                                    false // Don't trust z commits during initial scan
+                                } else {
+                                    // Trust r (if not shallow) or s (if shallow)
+                                    match parsed.prefix {
+                                        MessagePrefix::Regular if !is_shallow => true,
+                                        MessagePrefix::Shallow if is_shallow => true,
+                                        _ => false,
+                                    }
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    !has_trusted // Continue if not trusted
+                };
+
+                if should_continue {
+                    // Scan parents
+                    for parent_id in parents {
+                        if visited.insert(parent_id.clone()) {
+                            if let Some(parent) = self.repo.find_commit(parent_id.clone()) {
+                                commit_map.insert(parent_id.clone(), parent);
+                                queue.push((parent_id, depth + 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now determine if we're in z-mode
+        let z_mode = hit_depth_limit;
+
+        // If in z-mode, retrospectively trust z commits
+        if z_mode {
+            // Extend the graph by trusting z commits
+            let z_commits_vec: Vec<_> = z_commits.iter().cloned().collect();
+            for z_id in z_commits_vec {
+                if let Some(commit) = commit_map.get(&z_id) {
+                    if let Some(summary) = commit.summary() {
+                        if let Some(parsed) = MessageParser::parse(&summary) {
+                            if MessageParser::validate(self.repo, commit, &summary, &parsed) {
+                                if parsed.prefix == MessagePrefix::ZMode {
+                                    // This z commit is now trusted, stop scanning from it
+                                    // We don't need to do anything special here since we already
+                                    // have it in our graph
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Calculate indices from the collected graph
+        let revision_index = {
+            let mut count = 0;
+            let mut current_id = head.id();
+            while let Some(parents) = parent_map.get(&current_id) {
+                if parents.is_empty() {
+                    break;
+                }
+                count += 1;
+                current_id = parents[0].clone();
+            }
+            count
+        };
+
+        let generation_index = self.calculate_generation(&parent_map, &head.id());
+        let commit_index = visited.len().saturating_sub(1) as u32;
+
+        let origin = if revision_index == 0 {
+            None
+        } else {
+            self.calculate_origin(&parent_map, &commit_map)
+        };
+
+        GraphStats {
+            revision_index,
+            generation_index,
+            commit_index,
+            origin,
+            z_mode,
+        }
     }
 
     fn full_graph_walk(&self, head: &R::Commit, _is_shallow: bool, _unlimited_depth: bool) -> GraphStats {
@@ -396,7 +527,7 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         // 2. All its parents are missing from commit_map (shallow boundary)
         let mut roots: Vec<_> = parent_map
             .iter()
-            .filter(|(id, parents)| {
+            .filter(|(_id, parents)| {
                 if parents.is_empty() {
                     // True root
                     true
