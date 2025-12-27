@@ -395,7 +395,8 @@ impl Save {
 
         trace!("Running main with: {self:#?}");
 
-        Ok(())
+        // Actually perform the save operation
+        main(self.clone())
     }
 }
 
