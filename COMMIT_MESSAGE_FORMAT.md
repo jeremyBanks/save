@@ -7,42 +7,41 @@ The `save` tool automatically generates commit messages that encode information 
 ## Format
 
 ```
-[r|s][XXXX-]N [/ gG] [/ nC] [/ xHHHH]
+[r|s|z]N [/ gG] [/ nC] [/ xHHHH] [/ oHHHH]
 ```
 
 ### Components
 
-1. **Prefix**: `r` or `s`
+1. **Prefix**: `r`, `s`, or `z`
    - `r`: Regular (non-shallow) repository
    - `s`: Shallow repository (cloned with `--depth`)
+   - `z`: Z-mode (hit depth limit during scan)
 
-2. **Root Hash** (optional): `XXXX-`
-   - 4 hexadecimal digits representing the first 16 bits of SHA1 of all root commit OIDs
-   - Included when:
-     - Repository is shallow (always)
-     - Parent commit has `r0` or `s0` (following a root commit)
-     - Current commit is `r1` or `s1` (second commit in chain)
-     - Parent has a different root hash (e.g., after merging unrelated histories)
-   - Not included for true root commits (`r0` or `s0`)
-
-3. **Revision Index**: `N`
+2. **Revision Index**: `N`
    - Number of commits in the first-parent chain from this commit
    - Increments by 1 for each commit along the primary branch
    - `0` for root commits (no parents)
 
-4. **Generation Index** (optional): `/ gG`
+3. **Generation Index** (optional): `/ gG`
    - Maximum topological distance from any root commit
    - Only shown if different from revision index (indicates merge history)
 
-5. **Commit Index** (optional): `/ nC`
+4. **Commit Index** (optional): `/ nC`
    - Total number of reachable commits minus 1
    - Only shown if different from generation index
    - In shallow clones, reflects available history
 
-6. **Tree Hash**: `/ xHHHH`
+5. **Tree Hash**: `/ xHHHH`
    - First 4 hex digits of the tree hash (uppercase)
    - Brute-forced by manipulating commit timestamp
    - Omitted if tree is empty
+
+6. **Origin** (optional): `/ oHHHH`
+   - Last 4 hex digits (2 bytes) of root commit ID
+   - For single root: last 2 bytes of that root's OID
+   - For multiple roots: last 2 bytes of SHA1(sorted root OIDs)
+   - Omitted for root commits themselves (r0/s0/z0)
+   - Used to detect history changes and merges
 
 ## Examples
 
