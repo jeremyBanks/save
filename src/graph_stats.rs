@@ -390,10 +390,21 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         parent_map: &HashMap<<R::Commit as CommitView>::Id, Vec<<R::Commit as CommitView>::Id>>,
         commit_map: &HashMap<<R::Commit as CommitView>::Id, R::Commit>,
     ) -> Option<u16> {
-        // Find all root commits
+        // Find all root commits (true roots OR shallow boundary commits)
+        // A commit is a root if:
+        // 1. It has no parents (true root), OR
+        // 2. All its parents are missing from commit_map (shallow boundary)
         let mut roots: Vec<_> = parent_map
             .iter()
-            .filter(|(_, parents)| parents.is_empty())
+            .filter(|(id, parents)| {
+                if parents.is_empty() {
+                    // True root
+                    true
+                } else {
+                    // Check if all parents are missing (shallow boundary)
+                    parents.iter().all(|p| !commit_map.contains_key(p))
+                }
+            })
             .filter_map(|(id, _)| commit_map.get(id))
             .collect();
 
