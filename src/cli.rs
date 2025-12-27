@@ -236,6 +236,17 @@ pub struct Save {
     )]
     pub max_depth: i32,
 
+    /// Rebuild commit statistics from scratch, ignoring all existing commit
+    /// messages. This forces a full graph walk and recalculates all indices.
+    ///
+    /// Useful for verifying or fixing commit messages after history changes.
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "rebuild",
+        env = "SAVE_REBUILD"
+    )]
+    pub rebuild: bool,
+
     /// Adds another parent to the new commit. May be repeated to add multiple
     /// parents, though duplicated parents will are ignored.
     #[clap(
@@ -438,7 +449,11 @@ pub fn main(args: Save) -> Result<()> {
 
     // Calculate graph statistics using the new calculator
     let graph_stats = if let Some(ref commit) = head {
-        let calculator = GraphStatsCalculator::new(&repo, args.max_depth);
+        let calculator = if args.rebuild {
+            GraphStatsCalculator::new_rebuild(&repo, args.max_depth)
+        } else {
+            GraphStatsCalculator::new(&repo, args.max_depth)
+        };
         calculator.calculate(commit)
     } else {
         // No HEAD commit, use defaults

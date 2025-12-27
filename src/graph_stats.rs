@@ -185,6 +185,7 @@ impl MessageParser {
 pub struct GraphStatsCalculator<'repo, 'a: 'repo, R: RepositoryView<'repo>> {
     repo: &'a R,
     max_depth: i32,
+    trust_messages: bool,
     _phantom: std::marker::PhantomData<&'repo ()>,
 }
 
@@ -192,6 +193,7 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> Debug for GraphStatsCalculator<
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GraphStatsCalculator")
             .field("max_depth", &self.max_depth)
+            .field("trust_messages", &self.trust_messages)
             .finish_non_exhaustive()
     }
 }
@@ -201,6 +203,16 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         Self {
             repo,
             max_depth,
+            trust_messages: true,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn new_rebuild(repo: &'a R, max_depth: i32) -> Self {
+        Self {
+            repo,
+            max_depth,
+            trust_messages: false,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -231,7 +243,8 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
 
         // Try to optimize: if head itself has a trusted message, use it
         // (We're calculating stats for a commit that will be ON TOP of head)
-        if unlimited_depth {
+        // Skip optimization if trust_messages is false (rebuild mode)
+        if unlimited_depth && self.trust_messages {
             if let Some(summary) = head.summary() {
                 if let Some(parsed) = MessageParser::parse(&summary) {
                     if MessageParser::validate(self.repo, head, &summary, &parsed) {
@@ -302,20 +315,25 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
                     true
                 } else {
                     // For depth > 0, check trust first, then depth limit
-                    let has_trusted = if let Some(summary) = commit.summary() {
-                        if let Some(parsed) = MessageParser::parse(&summary) {
-                            if MessageParser::validate(self.repo, &commit, &summary, &parsed) {
-                                // Track z commits but don't trust them yet
-                                if parsed.prefix == MessagePrefix::ZMode {
-                                    z_commits.insert(id.clone());
-                                    false // Don't trust z commits during initial scan
-                                } else {
-                                    // Trust r (if not shallow) or s (if shallow)
-                                    match parsed.prefix {
-                                        MessagePrefix::Regular if !is_shallow => true,
-                                        MessagePrefix::Shallow if is_shallow => true,
-                                        _ => false,
+                    // Don't trust any messages if trust_messages is false (rebuild mode)
+                    let has_trusted = if self.trust_messages {
+                        if let Some(summary) = commit.summary() {
+                            if let Some(parsed) = MessageParser::parse(&summary) {
+                                if MessageParser::validate(self.repo, &commit, &summary, &parsed) {
+                                    // Track z commits but don't trust them yet
+                                    if parsed.prefix == MessagePrefix::ZMode {
+                                        z_commits.insert(id.clone());
+                                        false // Don't trust z commits during initial scan
+                                    } else {
+                                        // Trust r (if not shallow) or s (if shallow)
+                                        match parsed.prefix {
+                                            MessagePrefix::Regular if !is_shallow => true,
+                                            MessagePrefix::Shallow if is_shallow => true,
+                                            _ => false,
+                                        }
                                     }
+                                } else {
+                                    false
                                 }
                             } else {
                                 false
