@@ -284,6 +284,9 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         // Track collected z commits (we don't trust them initially)
         let mut z_commits = HashSet::new();
 
+        // Track boundary commits (where we stopped scanning)
+        let mut boundary_commits = HashSet::new();
+
         // BFS with depth tracking
         let mut queue: Vec<(_, usize)> = vec![(head.id(), 0)];
         visited.insert(head.id());
@@ -294,12 +297,12 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         while let Some((id, depth)) = queue.pop() {
             if let Some(commit) = commit_map.get(&id).cloned() {
                 let parents = commit.parent_ids();
-                parent_map.insert(id.clone(), parents.clone());
 
                 // Check if we should continue scanning from this commit
                 let should_continue = if depth >= max_depth {
                     // Hit depth limit on this path
                     hit_depth_limit = true;
+                    boundary_commits.insert(id.clone());
                     false
                 } else {
                     // Check if this commit has a trusted message
@@ -328,8 +331,14 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
                         false
                     };
 
+                    if has_trusted {
+                        boundary_commits.insert(id.clone());
+                    }
                     !has_trusted // Continue if not trusted
                 };
+
+                // Store parent info for ALL visited commits
+                parent_map.insert(id.clone(), parents.clone());
 
                 if should_continue {
                     // Scan parents
@@ -338,9 +347,15 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
                             if let Some(parent) = self.repo.find_commit(parent_id.clone()) {
                                 commit_map.insert(parent_id.clone(), parent);
                                 queue.push((parent_id, depth + 1));
+                            } else {
+                                // Parent not found (shallow boundary)
+                                boundary_commits.insert(id.clone());
                             }
                         }
                     }
+                } else if parents.is_empty() {
+                    // True root (no parents)
+                    boundary_commits.insert(id.clone());
                 }
             }
         }
@@ -373,23 +388,31 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
         let revision_index = {
             let mut count = 0;
             let mut current_id = head.id();
-            while let Some(parents) = parent_map.get(&current_id) {
-                if parents.is_empty() {
+            loop {
+                if boundary_commits.contains(&current_id) {
+                    // Reached a boundary (trusted commit or depth limit)
                     break;
                 }
-                count += 1;
-                current_id = parents[0].clone();
+                if let Some(parents) = parent_map.get(&current_id) {
+                    if parents.is_empty() {
+                        break;
+                    }
+                    count += 1;
+                    current_id = parents[0].clone();
+                } else {
+                    break;
+                }
             }
             count
         };
 
-        let generation_index = self.calculate_generation(&parent_map, &head.id());
+        let generation_index = self.calculate_generation_bounded(&parent_map, &head.id(), &boundary_commits);
         let commit_index = visited.len().saturating_sub(1) as u32;
 
         let origin = if revision_index == 0 {
             None
         } else {
-            self.calculate_origin(&parent_map, &commit_map)
+            self.calculate_origin_bounded(&parent_map, &commit_map, &boundary_commits)
         };
 
         GraphStats {
@@ -398,6 +421,107 @@ impl<'repo, 'a: 'repo, R: RepositoryView<'repo>> GraphStatsCalculator<'repo, 'a,
             commit_index,
             origin,
             z_mode,
+        }
+    }
+
+    /// Calculate generation index for bounded graph (depth-limited scan).
+    fn calculate_generation_bounded(
+        &self,
+        parent_map: &HashMap<<R::Commit as CommitView>::Id, Vec<<R::Commit as CommitView>::Id>>,
+        head_id: &<R::Commit as CommitView>::Id,
+        boundary_commits: &HashSet<<R::Commit as CommitView>::Id>,
+    ) -> u32 {
+        let mut distances = HashMap::new();
+
+        // Initialize: boundary commits have distance 0
+        for boundary_id in boundary_commits {
+            distances.insert(boundary_id.clone(), 0);
+        }
+
+        // Process in reverse topological order
+        let mut processed = HashSet::new();
+        let mut max_distance = 0;
+
+        fn visit<Id: Clone + Eq + Hash + Ord + Debug>(
+            id: &Id,
+            parent_map: &HashMap<Id, Vec<Id>>,
+            distances: &mut HashMap<Id, u32>,
+            processed: &mut HashSet<Id>,
+            max_distance: &mut u32,
+            boundary_commits: &HashSet<Id>,
+        ) -> u32 {
+            if let Some(&dist) = distances.get(id) {
+                return dist;
+            }
+
+            if !processed.insert(id.clone()) {
+                // Cycle detection (shouldn't happen in git)
+                return 0;
+            }
+
+            // If this is a boundary, it's a root
+            if boundary_commits.contains(id) {
+                distances.insert(id.clone(), 0);
+                return 0;
+            }
+
+            let parents = parent_map.get(id).map(|p| p.as_slice()).unwrap_or(&[]);
+            let max_parent_dist = parents
+                .iter()
+                .map(|p| visit(p, parent_map, distances, processed, max_distance, boundary_commits))
+                .max()
+                .unwrap_or(0);
+
+            let dist = max_parent_dist + 1;
+            distances.insert(id.clone(), dist);
+            if dist > *max_distance {
+                *max_distance = dist;
+            }
+            dist
+        }
+
+        visit(head_id, parent_map, &mut distances, &mut processed, &mut max_distance, boundary_commits);
+        max_distance
+    }
+
+    /// Calculate origin for bounded graph.
+    fn calculate_origin_bounded(
+        &self,
+        parent_map: &HashMap<<R::Commit as CommitView>::Id, Vec<<R::Commit as CommitView>::Id>>,
+        commit_map: &HashMap<<R::Commit as CommitView>::Id, R::Commit>,
+        boundary_commits: &HashSet<<R::Commit as CommitView>::Id>,
+    ) -> Option<u16> {
+        // Use boundary commits as our "roots"
+        let mut roots: Vec<_> = boundary_commits
+            .iter()
+            .filter_map(|id| commit_map.get(id))
+            .collect();
+
+        if roots.is_empty() {
+            return None;
+        }
+
+        roots.sort_by_key(|c| c.id());
+
+        if roots.len() == 1 {
+            // Single root: use last 2 bytes (16 bits) of its ID
+            let bytes = roots[0].id_bytes();
+            if bytes.len() >= 2 {
+                let last_two = &bytes[bytes.len() - 2..];
+                Some(u16::from_be_bytes([last_two[0], last_two[1]]))
+            } else {
+                Some(0x0000)
+            }
+        } else {
+            // Multiple roots: sort their IDs, hash them together, use last 2 bytes
+            use sha1::{Digest, Sha1};
+            let mut hasher = Sha1::new();
+            for root in &roots {
+                hasher.update(root.id_bytes());
+            }
+            let hash = hasher.finalize();
+            // Use last 2 bytes (bytes 18-19 of 20-byte SHA1)
+            Some(u16::from_be_bytes([hash[18], hash[19]]))
         }
     }
 
