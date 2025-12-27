@@ -217,6 +217,22 @@ pub struct Save {
     )]
     pub no_head: bool,
 
+    /// Maximum depth to search back through commit history when calculating
+    /// graph statistics. If this depth is reached without finding a trusted
+    /// commit message, the tool enters "z-mode" and treats the commit at
+    /// max depth as an effective origin.
+    ///
+    /// Set to -1 for unlimited depth (full graph walk).
+    ///
+    /// [default: 255]
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "max-depth",
+        env = "SAVE_MAX_DEPTH",
+        default_value = "255"
+    )]
+    pub max_depth: i32,
+
     /// Adds another parent to the new commit. May be repeated to add multiple
     /// parents, though duplicated parents will are ignored.
     #[clap(
