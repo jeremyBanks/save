@@ -572,7 +572,7 @@ fn get_git_user(args: &Save, repo: &Repository, head: &Option<Commit>) -> Result
             config_name
         } else if let Some(previous_name) = head
             .as_ref()
-            .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+            .and_then(|x| x.author().name().map(ToString::to_string))
         {
             info!(
                 "Using author name from previous commit: {:?}",
@@ -603,7 +603,7 @@ fn get_git_user(args: &Save, repo: &Repository, head: &Option<Commit>) -> Result
         config_email
     } else if let Some(previous_email) = head
         .as_ref()
-        .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+        .and_then(|x| x.author().email().map(ToString::to_string))
     {
         info!(
             "Using author email from previous commit: {:?}",
@@ -640,7 +640,7 @@ fn open_or_init_repo(args: &Save) -> Result<Repository> {
             repo
         },
         Err(_err) => {
-            let path = std::env::current_dir()?;
+            let path = env::current_dir()?;
             let empty = fs::read_dir(&path)?.next().is_none();
             info!("No Git repository found.");
 

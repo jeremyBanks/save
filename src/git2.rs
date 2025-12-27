@@ -7,7 +7,7 @@ use {
         core::{
             borrow::Borrow,
             fmt::Debug,
-            intrinsics::transmute,
+            mem::transmute,
             ops::{Deref, DerefMut},
         },
         digest::{generic_array::GenericArray, typenum::U20, Digest},
@@ -89,7 +89,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// these are not present, a warning is logged and we fall back to the
     /// author of the current HEAD commit. If there *is* no HEAD commit, we
     /// fall back to a generic placeholder signature.
-    fn signature_or_fallback(&self) -> Signature {
+    fn signature_or_fallback(&self) -> Signature<'_> {
         let repo: &Repository = self.borrow();
 
         if let Ok(signature) = repo.signature() {
@@ -107,7 +107,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
             },
         };
 
-        let (user_name, user_email) = {
+        let (_user_name, _user_email) = {
             let config = self.borrow().config().unwrap();
 
             let user_name: String = {
@@ -116,7 +116,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
                     config_name
                 } else if let Some(previous_name) = head
                     .as_ref()
-                    .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+                    .and_then(|x| x.author().name().map(ToString::to_string))
                 {
                     info!("{previous_name}");
                     previous_name
@@ -136,7 +136,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
                 config_email
             } else if let Some(previous_email) = head
                 .as_ref()
-                .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+                .and_then(|x| x.author().email().map(ToString::to_string))
             {
                 info!(
                     "Using author email from previous commit: {:?}",
@@ -167,7 +167,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// # Errors
     ///
     /// ?
-    fn save(&self) -> Result<Commit> {
+    fn save(&self) -> Result<Commit<'_>> {
         let repo: &Repository = self.borrow();
 
         let mut index = self.working_index()?;
@@ -507,7 +507,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                             .as_bytes()
                             .iter()
                             .zip(target_prefix.iter())
-                            .map(|(a, b)| (a ^ b))
+                            .map(|(a, b)| a ^ b)
                             .zip(target_mask.iter())
                             .map(|(x, mask)| x & *mask)
                             .all(|x| x == 0)

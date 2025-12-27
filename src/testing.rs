@@ -1,6 +1,5 @@
 use ::{
     core::{mem, ops::Range, panic, fmt::{self, Debug}},
-    expect_test::ExpectedData,
     once_cell::sync::{Lazy, OnceCell},
     std::{
         collections::HashMap,
@@ -136,7 +135,7 @@ pub struct ExpectFile {
     pub position: &'static str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
     #[doc(hidden)]
     pub file: &'static str,
@@ -152,7 +151,7 @@ impl fmt::Display for Position {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum StrLitKind {
     Normal,
     Raw(usize),
@@ -195,7 +194,7 @@ impl Expect {
         Runtime::fail_expect(self, &trimmed, actual);
     }
 
-    pub fn assert_debug_eq(&self, actual: &impl fmt::Debug) {
+    pub fn assert_debug_eq(&self, actual: &impl Debug) {
         let actual = format!("{:#?}\n", actual);
         self.assert_eq(&actual)
     }
@@ -353,7 +352,7 @@ impl ExpectFile {
         Runtime::fail_file(self, &expected, actual);
     }
 
-    pub fn assert_debug_eq(&self, actual: &impl fmt::Debug) {
+    pub fn assert_debug_eq(&self, actual: &impl Debug) {
         let actual = format!("{:#?}\n", actual);
         self.assert_eq(&actual)
     }
@@ -623,7 +622,7 @@ fn trim_indent(mut text: &str) -> String {
         .collect()
 }
 
-fn lines_with_ends(text: &str) -> LinesWithEnds {
+fn lines_with_ends(text: &str) -> LinesWithEnds<'_> {
     LinesWithEnds { text }
 }
 
