@@ -451,8 +451,51 @@ pub fn main(args: Save) -> Result<()> {
 
     let tree = repo.find_tree(tree)?;
 
+    // Determine if we should include root hash prefix and use 's' for shallow
+    let is_shallow = repo.is_shallow();
+    let mut include_root_hash = is_shallow; // Always include if shallow
+
+    // Parse parent commit messages to check for root hash and revision index
+    if let Some(ref parent_commit) = head {
+        let parent_msg = parent_commit.summary().unwrap_or("");
+
+        // Parse parent message format: [r|s][XXXX-]N / ...
+        // Extract root hash (if present) and revision index
+        if let Some((prefix_part, _rest)) = parent_msg.split_once(" / ") {
+            let prefix_part = prefix_part.trim();
+
+            // Check if parent has r0 or s0
+            if prefix_part == "r0" || prefix_part == "s0" {
+                include_root_hash = true;
+            }
+
+            // Check if parent has a root hash prefix that differs from ours
+            if let Some((root_part, _)) = prefix_part.strip_prefix(char::is_alphabetic)
+                .and_then(|s| s.split_once('-'))
+            {
+                if let Ok(parent_root_hash) = u16::from_str_radix(root_part, 16) {
+                    if parent_root_hash != graph_stats.roots_hash {
+                        include_root_hash = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Include root hash if this is r1 or s1
+    if graph_stats.revision_index == 1 {
+        include_root_hash = true;
+    }
+
+    // Format the commit message
     let mut message = String::new();
-    write!(message, "r{}", graph_stats.revision_index)?;
+    let prefix_char = if is_shallow { 's' } else { 'r' };
+
+    if include_root_hash {
+        write!(message, "{}{:04X}-{}", prefix_char, graph_stats.roots_hash, graph_stats.revision_index)?;
+    } else {
+        write!(message, "{}{}", prefix_char, graph_stats.revision_index)?;
+    }
 
     if graph_stats.generation_index != graph_stats.revision_index {
         write!(message, " / g{}", graph_stats.generation_index)?;

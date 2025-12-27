@@ -187,6 +187,8 @@ pub struct GraphStats {
     pub revision_index: u32,
     pub generation_index: u32,
     pub commit_index: u32,
+    /// Hash of all root commit OIDs (first 16 bits of SHA1 of sorted, concatenated root OIDs)
+    pub roots_hash: u16,
 }
 
 impl RepositoryExt for Repository {}
@@ -330,10 +332,30 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             revision_index
         };
 
+        // Calculate roots hash: find all root commits (no parents) and hash their OIDs
+        let roots_hash = {
+            let mut root_oids: Vec<Oid> = graph
+                .nodes()
+                .filter(|&node| graph.edges_directed(node, Outgoing).count() == 0)
+                .collect();
+            root_oids.sort();
+
+            // Hash the concatenated root OIDs
+            let mut hasher = ::sha1::Sha1::new();
+            for oid in root_oids {
+                hasher.update(oid.as_bytes());
+            }
+            let hash_bytes = hasher.finalize();
+
+            // Take first 16 bits (2 bytes) as u16
+            u16::from_be_bytes([hash_bytes[0], hash_bytes[1]])
+        };
+
         GraphStats {
             revision_index,
             generation_index,
             commit_index,
+            roots_hash,
         }
     }
 
