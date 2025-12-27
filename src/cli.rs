@@ -1,7 +1,10 @@
 //! The CLI.
 
 use {
-    crate::git2::*,
+    crate::{
+        git2::*,
+        graph_stats::GraphStatsCalculator,
+    },
     ::{
         clap::{AppSettings, Parser},
         eyre::{bail, Result},
@@ -433,10 +436,14 @@ pub fn main(args: Save) -> Result<()> {
 
     let (user_name, user_email) = get_git_user(&args, &repo, &head)?;
 
-    let graph_stats = head
-        .as_ref()
-        .map(|commit| commit.graph_stats(&repo))
-        .unwrap_or_default();
+    // Calculate graph statistics using the new calculator
+    let graph_stats = if let Some(ref commit) = head {
+        let calculator = GraphStatsCalculator::new(&repo, args.max_depth);
+        calculator.calculate(commit)
+    } else {
+        // No HEAD commit, use defaults
+        crate::graph_stats::GraphStats::default()
+    };
 
     let mut index = repo.working_index()?;
 
@@ -470,9 +477,17 @@ pub fn main(args: Save) -> Result<()> {
     // Format the commit message
     let mut message = String::new();
     let is_shallow = repo.is_shallow();
-    let prefix_char = if is_shallow { 's' } else { 'r' };
 
-    // Prefix: [r|s]N
+    // Determine prefix based on z_mode and shallow state
+    let prefix_char = if graph_stats.z_mode {
+        'z'
+    } else if is_shallow {
+        's'
+    } else {
+        'r'
+    };
+
+    // Prefix: [r|s|z]N
     write!(message, "{}{}", prefix_char, graph_stats.revision_index)?;
 
     // Optional: / gG (only if different from revision)
