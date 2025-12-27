@@ -1,5 +1,6 @@
 use ::{
     core::{mem, ops::Range, panic, fmt::{self, Debug}},
+    expect_test::ExpectedData,
     once_cell::sync::{Lazy, OnceCell},
     std::{
         collections::HashMap,
