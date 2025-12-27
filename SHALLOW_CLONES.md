@@ -78,8 +78,45 @@ From `src/git2.rs:270-338`, the `graph_stats()` function:
 
 The tool does not crash or error in shallow clones - it simply works with the limited history available.
 
+## Finding the Oldest Commits
+
+**Yes, we can determine what the oldest commits are in a shallow repository:**
+
+1. **Read `.git/shallow` file directly**:
+   ```bash
+   $ cat .git/shallow
+   0edc78b82bea85e1b2165d8e870a5c3535919695
+   3680fc138e31d8a9e8e344d72c6692e921dbb4a3
+   ...
+   ```
+   These are the commit IDs at the shallow boundary.
+
+2. **Use `Repository::is_shallow()` to detect shallow clones**:
+   ```rust
+   if repo.is_shallow() {
+       // Read .git/shallow to get boundary commits
+   }
+   ```
+
+3. **Understand the boundary semantics**:
+   - Commits in `.git/shallow` are **not** root commits (they have `parent_count() > 0`)
+   - Their parent commit objects simply **don't exist** in the repository
+   - Calling `commit.parent(i)` on these commits returns `Err("object not found")`
+   - This is why they appear as "leaf nodes" in graph traversal
+
+**Example from depth=10 Linux clone:**
+```
+Boundary commit: 0edc78b82bea - "x86/msi: Make irq_retrigger() functional..."
+  parent_count(): 1
+  parent(0): ERROR - object not found (21433d3e3c...)
+```
+
+The commit has a parent reference encoded in its object, but that parent doesn't exist in `.git/objects/`.
+
 ## Recommendation
 
 For shallow clones, the commit_index provides the most useful information: the number of commits reachable from HEAD minus 1. This gives users a sense of how much history is available in their shallow clone.
+
+To find the "oldest" commits (shallow boundary), read `.git/shallow` directly or detect when `commit.parent(i)` fails with "object not found".
 
 No code changes are needed - the tool handles shallow clones correctly as-is.
