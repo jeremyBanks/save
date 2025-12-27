@@ -1,7 +1,10 @@
 //! The CLI.
 
 use {
-    crate::git2::*,
+    crate::{
+        git2::*,
+        graph_stats::GraphStatsCalculator,
+    },
     ::{
         clap::{AppSettings, Parser},
         eyre::{bail, Result},
@@ -217,6 +220,33 @@ pub struct Save {
     )]
     pub no_head: bool,
 
+    /// Maximum depth to search back through commit history when calculating
+    /// graph statistics. If this depth is reached without finding a trusted
+    /// commit message, the tool enters "z-mode" and treats the commit at
+    /// max depth as an effective origin.
+    ///
+    /// Set to -1 for unlimited depth (full graph walk).
+    ///
+    /// [default: 255]
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "max-depth",
+        env = "SAVE_MAX_DEPTH",
+        default_value = "255"
+    )]
+    pub max_depth: i32,
+
+    /// Rebuild commit statistics from scratch, ignoring all existing commit
+    /// messages. This forces a full graph walk and recalculates all indices.
+    ///
+    /// Useful for verifying or fixing commit messages after history changes.
+    #[clap(
+        help_heading = "HISTORY OPTIONS",
+        long = "rebuild",
+        env = "SAVE_REBUILD"
+    )]
+    pub rebuild: bool,
+
     /// Adds another parent to the new commit. May be repeated to add multiple
     /// parents, though duplicated parents will are ignored.
     #[clap(
@@ -395,7 +425,8 @@ impl Save {
 
         trace!("Running main with: {self:#?}");
 
-        Ok(())
+        // Actually perform the save operation
+        main(self.clone())
     }
 }
 
@@ -416,10 +447,18 @@ pub fn main(args: Save) -> Result<()> {
 
     let (user_name, user_email) = get_git_user(&args, &repo, &head)?;
 
-    let graph_stats = head
-        .as_ref()
-        .map(|commit| commit.graph_stats())
-        .unwrap_or_default();
+    // Calculate graph statistics using the new calculator
+    let graph_stats = if let Some(ref commit) = head {
+        let calculator = if args.rebuild {
+            GraphStatsCalculator::new_rebuild(&repo, args.max_depth)
+        } else {
+            GraphStatsCalculator::new(&repo, args.max_depth)
+        };
+        calculator.calculate(commit)
+    } else {
+        // No HEAD commit, use defaults
+        crate::graph_stats::GraphStats::default()
+    };
 
     let mut index = repo.working_index()?;
 
@@ -450,19 +489,40 @@ pub fn main(args: Save) -> Result<()> {
 
     let tree = repo.find_tree(tree)?;
 
+    // Format the commit message
     let mut message = String::new();
-    write!(message, "r{}", graph_stats.revision_index)?;
+    let is_shallow = repo.is_shallow();
 
+    // Determine prefix based on z_mode and shallow state
+    let prefix_char = if graph_stats.z_mode {
+        'z'
+    } else if is_shallow {
+        's'
+    } else {
+        'r'
+    };
+
+    // Prefix: [r|s|z]N
+    write!(message, "{}{}", prefix_char, graph_stats.revision_index)?;
+
+    // Optional: / gG (only if different from revision)
     if graph_stats.generation_index != graph_stats.revision_index {
         write!(message, " / g{}", graph_stats.generation_index)?;
     }
 
+    // Optional: / nC (only if different from generation)
     if graph_stats.commit_index != graph_stats.generation_index {
         write!(message, " / n{}", graph_stats.commit_index)?;
     }
 
+    // Optional: / xHHHH (tree hash, if non-empty)
     if !tree.is_empty() {
         write!(message, " / x{tree4}")?;
+    }
+
+    // Optional: / oHHHH (origin, omitted for root commits)
+    if let Some(origin) = graph_stats.origin {
+        write!(message, " / o{:04X}", origin)?;
     }
 
     // TODO: look at merge heads too, and set our minimum timestamp to one greater
@@ -497,12 +557,21 @@ pub fn main(args: Save) -> Result<()> {
     debug!("Prepared commit {}", commit.id());
 
     if !args.no_head {
-        let mut head_ref = repo.head()?;
-        info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
-        if head_ref.is_branch() {
-            head_ref.set_target(commit.id(), "committed via save")?;
-        } else {
-            repo.set_head(&commit.id().to_string())?;
+        match repo.head() {
+            Ok(mut head_ref) => {
+                info!("Updating HEAD: {}", head_ref.shorthand().unwrap());
+                if head_ref.is_branch() {
+                    head_ref.set_target(commit.id(), "committed via save")?;
+                } else {
+                    repo.set_head(&commit.id().to_string())?;
+                }
+            }
+            Err(err) if err.code() == ErrorCode::UnbornBranch => {
+                // First commit on unborn branch - set HEAD to point to the new commit
+                info!("Creating first commit on unborn branch");
+                repo.set_head_detached(commit.id())?;
+            }
+            Err(err) => return Err(err.into()),
         }
     } else {
         info!("Not updating HEAD because this is a dry run.");
@@ -571,7 +640,7 @@ fn get_git_user(args: &Save, repo: &Repository, head: &Option<Commit>) -> Result
             config_name
         } else if let Some(previous_name) = head
             .as_ref()
-            .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+            .and_then(|x| x.author().name().map(ToString::to_string))
         {
             info!(
                 "Using author name from previous commit: {:?}",
@@ -602,7 +671,7 @@ fn get_git_user(args: &Save, repo: &Repository, head: &Option<Commit>) -> Result
         config_email
     } else if let Some(previous_email) = head
         .as_ref()
-        .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+        .and_then(|x| x.author().email().map(ToString::to_string))
     {
         info!(
             "Using author email from previous commit: {:?}",
@@ -639,7 +708,7 @@ fn open_or_init_repo(args: &Save) -> Result<Repository> {
             repo
         },
         Err(_err) => {
-            let path = std::env::current_dir()?;
+            let path = env::current_dir()?;
             let empty = fs::read_dir(&path)?.next().is_none();
             info!("No Git repository found.");
 

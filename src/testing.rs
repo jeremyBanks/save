@@ -4,18 +4,20 @@ use ::{
     std::{
         collections::HashMap,
         env, fs,
+        panic::resume_unwind,
         path::{Path, PathBuf},
         sync::Mutex,
     },
 };
 
 //
-//
-#[track_caller]
-fn assert_eq<Literal: self::Literal>(expected: Literal, actual: Literal) {
-    assert!(Expected::from_caller() == actual)
-    assert_eq!(expected, actual);
-}
+// Note: Custom assert_eq and Expected types appear to be unfinished experimental code
+// Commenting out until/unless needed
+// #[track_caller]
+// fn assert_eq<Literal: self::Literal>(expected: Literal, actual: Literal) {
+//     assert!(Expected::from_caller() == actual);
+//     assert_eq!(expected, actual);
+// }
 
 pub trait Literal: Clone + Debug + Copy + PartialEq {}
 
@@ -68,7 +70,7 @@ pub enum ExpectedLocation {
 }
 
 #[track_caller]
-pub fn assert_debug_eq(expected: impl expect_test::ExpectedData, actual: impl ::core::fmt::Debug) {
+pub fn assert_debug_eq(expected: &'static str, actual: impl ::core::fmt::Debug) {
     expect(expected).assert_eq(&format!("{actual:?}"));
 }
 
@@ -81,7 +83,9 @@ fn update_expect() -> bool {
     env::var("SAVE_EXPECTATIONS").is_ok() || env::var("UPDATE_EXPECT").is_ok()
 }
 
-
+const HELP: &str = "
+To update expectations, set SAVE_EXPECTATIONS=1 or UPDATE_EXPECT=1 environment variable.
+";
 
 #[track_caller]
 pub fn expect(data: &'static str) -> Expect {
@@ -92,7 +96,7 @@ pub fn expect(data: &'static str) -> Expect {
             line: location.line(),
             column: location.column(),
         },
-        data: data.str(),
+        data: data,
         indent: true,
     }
 }
@@ -131,7 +135,7 @@ pub struct ExpectFile {
     pub position: &'static str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
     #[doc(hidden)]
     pub file: &'static str,
@@ -147,7 +151,7 @@ impl fmt::Display for Position {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum StrLitKind {
     Normal,
     Raw(usize),
@@ -190,7 +194,7 @@ impl Expect {
         Runtime::fail_expect(self, &trimmed, actual);
     }
 
-    pub fn assert_debug_eq(&self, actual: &impl fmt::Debug) {
+    pub fn assert_debug_eq(&self, actual: &impl Debug) {
         let actual = format!("{:#?}\n", actual);
         self.assert_eq(&actual)
     }
@@ -348,7 +352,7 @@ impl ExpectFile {
         Runtime::fail_file(self, &expected, actual);
     }
 
-    pub fn assert_debug_eq(&self, actual: &impl fmt::Debug) {
+    pub fn assert_debug_eq(&self, actual: &impl Debug) {
         let actual = format!("{:#?}\n", actual);
         self.assert_eq(&actual)
     }
@@ -437,7 +441,7 @@ impl Runtime {
             format_chunks(diff)
         );
         // Use resume_unwind instead of panic!() to prevent a backtrace, which is unnecessary noise.
-        panic::resume_unwind(Box::new(()));
+        resume_unwind(Box::new(()));
     }
 }
 
@@ -618,7 +622,7 @@ fn trim_indent(mut text: &str) -> String {
         .collect()
 }
 
-fn lines_with_ends(text: &str) -> LinesWithEnds {
+fn lines_with_ends(text: &str) -> LinesWithEnds<'_> {
     LinesWithEnds { text }
 }
 

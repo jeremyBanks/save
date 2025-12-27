@@ -1,13 +1,16 @@
 //! Extending [`::git2`] (`libgit2`).
 
 use {
-    crate::zigzag::ZugZug,
+    crate::{
+        graph_stats::{CommitView, RepositoryView},
+        zigzag::ZugZug,
+    },
     std::borrow::BorrowMut,
     ::{
         core::{
             borrow::Borrow,
             fmt::Debug,
-            intrinsics::transmute,
+            mem::transmute,
             ops::{Deref, DerefMut},
         },
         digest::{generic_array::GenericArray, typenum::U20, Digest},
@@ -89,7 +92,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// these are not present, a warning is logged and we fall back to the
     /// author of the current HEAD commit. If there *is* no HEAD commit, we
     /// fall back to a generic placeholder signature.
-    fn signature_or_fallback(&self) -> Signature {
+    fn signature_or_fallback(&self) -> Signature<'_> {
         let repo: &Repository = self.borrow();
 
         if let Ok(signature) = repo.signature() {
@@ -107,7 +110,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
             },
         };
 
-        let (user_name, user_email) = {
+        let (_user_name, _user_email) = {
             let config = self.borrow().config().unwrap();
 
             let user_name: String = {
@@ -116,7 +119,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
                     config_name
                 } else if let Some(previous_name) = head
                     .as_ref()
-                    .and_then(|x| x.author().name().map(std::string::ToString::to_string))
+                    .and_then(|x| x.author().name().map(ToString::to_string))
                 {
                     info!("{previous_name}");
                     previous_name
@@ -136,7 +139,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
                 config_email
             } else if let Some(previous_email) = head
                 .as_ref()
-                .and_then(|x| x.author().email().map(std::string::ToString::to_string))
+                .and_then(|x| x.author().email().map(ToString::to_string))
             {
                 info!(
                     "Using author email from previous commit: {:?}",
@@ -167,7 +170,7 @@ pub trait RepositoryExt: Borrow<Repository> + BorrowMut<Repository> {
     /// # Errors
     ///
     /// ?
-    fn save(&self) -> Result<Commit> {
+    fn save(&self) -> Result<Commit<'_>> {
         let repo: &Repository = self.borrow();
 
         let mut index = self.working_index()?;
@@ -187,6 +190,10 @@ pub struct GraphStats {
     pub revision_index: u32,
     pub generation_index: u32,
     pub commit_index: u32,
+    /// Hash of all root commit OIDs (first 16 bits of SHA1 of sorted, concatenated root OIDs)
+    pub roots_hash: u16,
+    /// Origin: last 4 hex digits of root commit ID, or None for root commits (r0/s0)
+    pub origin: Option<u16>,
 }
 
 impl RepositoryExt for Repository {}
@@ -257,10 +264,95 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
         body
     }
 
-    #[instrument(level = "debug")]
+    /// Parse a commit message in our format to extract GraphStats
+    /// Returns Some(stats) if the message matches our format and tree hash validates
+    fn parse_commit_message(commit: &Commit, repo: &Repository) -> Option<GraphStats> {
+        let msg = commit.summary()?;
+        debug!("Parsing commit message: {}", msg);
+
+        // Parse format: [r|s]N [/ gG] [/ nC] [/ xHHHH] [/ oHHHH]
+        let parts: Vec<&str> = msg.split(" / ").collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        let prefix = parts[0].trim();
+        let is_shallow = prefix.starts_with('s');
+
+        // Extract revision index
+        let revision_str = prefix.strip_prefix(if is_shallow { 's' } else { 'r' })?;
+        let revision_index: u32 = revision_str.parse().ok()?;
+        debug!("Parsed revision_index: {}", revision_index);
+
+        // Verify tree hash if present
+        let tree_id = commit.tree().ok()?.id();
+        let tree_hex = format!("{}", tree_id);
+        let tree_prefix = &tree_hex[..4].to_uppercase();
+
+        for part in &parts[1..] {
+            let part = part.trim();
+            if part.starts_with('x') {
+                let msg_tree = part.strip_prefix('x')?;
+                debug!("Validating tree hash: msg={}, actual={}", msg_tree, tree_prefix);
+                if msg_tree != tree_prefix {
+                    debug!("Tree hash mismatch, cannot trust");
+                    return None; // Tree hash doesn't match, can't trust
+                }
+            }
+        }
+
+        // Extract other fields if present
+        let mut generation_index = revision_index;
+        let mut commit_index = revision_index;
+        let mut origin: Option<u16> = None;
+
+        for part in &parts[1..] {
+            let part = part.trim();
+            if let Some(g) = part.strip_prefix('g') {
+                generation_index = g.parse().ok()?;
+            } else if let Some(n) = part.strip_prefix('n') {
+                commit_index = n.parse().ok()?;
+            } else if let Some(o) = part.strip_prefix('o') {
+                origin = Some(u16::from_str_radix(o, 16).ok()?);
+            }
+        }
+
+        // Only trust 's' prefix if we're also shallow
+        if is_shallow && !repo.is_shallow() {
+            return None;
+        }
+
+        Some(GraphStats {
+            revision_index,
+            generation_index,
+            commit_index,
+            roots_hash: 0, // Not used when trusting parent
+            origin,
+        })
+    }
+
+    #[instrument(level = "debug", skip(repo))]
     #[must_use]
-    fn graph_stats(&self) -> GraphStats {
+    fn graph_stats(&self, repo: &Repository) -> GraphStats {
         let commit: &Commit = self.borrow();
+
+        // Optimization: If we have a single parent with a valid message, trust it
+        let parents: Vec<_> = commit.parents().collect();
+        debug!("Number of parents: {}", parents.len());
+        if parents.len() == 1 {
+            debug!("Attempting to parse parent message");
+            if let Some(mut parent_stats) = Self::parse_commit_message(&parents[0], repo) {
+                // Inherit from parent, just increment indices
+                parent_stats.revision_index += 1;
+                parent_stats.generation_index += 1;
+                parent_stats.commit_index += 1;
+                // origin stays the same (inherited from parent)
+                debug!("Trusting parent commit message, incrementing indices");
+                return parent_stats;
+            }
+        }
+
+        // Fall back to full graph walk
 
         // Git commit graph as petgraph:
         // - nodes are the commit Oids
@@ -318,7 +410,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             }
         }
 
-        let commit_index: u32 = (graph.node_count() - 1).try_into().unwrap();
+        let commit_index: u32 = graph.node_count().saturating_sub(1).try_into().unwrap();
         let generation_index = global_maximum_weight;
         let revision_index = {
             let mut revision_index = 0;
@@ -330,10 +422,61 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
             revision_index
         };
 
+        // Calculate roots hash: find all root commits (no parents) and hash their OIDs
+        let roots_hash = {
+            let mut root_oids: Vec<Oid> = graph
+                .nodes()
+                .filter(|&node| graph.edges_directed(node, Outgoing).count() == 0)
+                .collect();
+            root_oids.sort();
+
+            // Hash the concatenated root OIDs
+            let mut hasher = ::sha1::Sha1::new();
+            for oid in root_oids {
+                hasher.update(oid.as_bytes());
+            }
+            let hash_bytes = hasher.finalize();
+
+            // Take first 16 bits (2 bytes) as u16
+            u16::from_be_bytes([hash_bytes[0], hash_bytes[1]])
+        };
+
+        // Calculate origin: last 4 hex digits of root commit ID(s)
+        // For root commits (r0/s0), origin is None
+        let origin = if revision_index == 0 {
+            None
+        } else {
+            let mut root_oids: Vec<Oid> = graph
+                .nodes()
+                .filter(|&node| graph.edges_directed(node, Outgoing).count() == 0)
+                .collect();
+            root_oids.sort();
+
+            if root_oids.is_empty() {
+                None
+            } else if root_oids.len() == 1 {
+                // Single root: use last 4 hex digits of root's OID
+                let oid_bytes = root_oids[0].as_bytes();
+                let last_two = &oid_bytes[18..20]; // Last 2 bytes of 20-byte SHA1
+                Some(u16::from_be_bytes([last_two[0], last_two[1]]))
+            } else {
+                // Multiple roots: hash them together and use last 4 hex digits
+                let mut hasher = ::sha1::Sha1::new();
+                for oid in root_oids {
+                    hasher.update(oid.as_bytes());
+                }
+                let hash_bytes = hasher.finalize();
+                // Take last 16 bits (bytes 18-19 of 20-byte hash)
+                Some(u16::from_be_bytes([hash_bytes[18], hash_bytes[19]]))
+            }
+        };
+
         GraphStats {
             revision_index,
             generation_index,
             commit_index,
+            roots_hash,
+            origin,
         }
     }
 
@@ -507,7 +650,7 @@ pub trait CommitExt<'repo>: Borrow<Commit<'repo>> + Debug {
                             .as_bytes()
                             .iter()
                             .zip(target_prefix.iter())
-                            .map(|(a, b)| (a ^ b))
+                            .map(|(a, b)| a ^ b)
                             .zip(target_mask.iter())
                             .map(|(x, mask)| x & *mask)
                             .all(|x| x == 0)
@@ -622,3 +765,49 @@ pub trait OidExt: Borrow<Oid> + Debug {
 }
 
 impl OidExt for Oid {}
+
+// Implementations of graph_stats traits for git2 types
+
+impl CommitView for Commit<'_> {
+    type Id = Oid;
+
+    fn id(&self) -> Self::Id {
+        Commit::id(self)
+    }
+
+    fn parent_ids(&self) -> Vec<Self::Id> {
+        (0..self.parent_count())
+            .filter_map(|i| self.parent_id(i).ok())
+            .collect()
+    }
+
+    fn summary(&self) -> Option<String> {
+        Commit::summary(self).map(String::from)
+    }
+
+    fn tree_id(&self) -> Self::Id {
+        self.tree_id()
+    }
+
+    fn id_bytes(&self) -> Vec<u8> {
+        self.id().as_bytes().to_vec()
+    }
+}
+
+impl<'repo> RepositoryView<'repo> for Repository {
+    type Commit = Commit<'repo>;
+
+    fn is_shallow(&self) -> bool {
+        Repository::is_shallow(self)
+    }
+
+    fn find_commit(&'repo self, id: Oid) -> Option<Self::Commit> {
+        self.find_commit(id).ok()
+    }
+
+    fn validate_tree_prefix(&self, tree_id: &Oid, prefix: &str) -> bool {
+        let tree_hex = format!("{}", tree_id);
+        let tree_prefix = tree_hex[..prefix.len().min(tree_hex.len())].to_uppercase();
+        tree_prefix == prefix.to_uppercase()
+    }
+}
