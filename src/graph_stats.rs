@@ -71,6 +71,10 @@ pub trait CommitView: Clone + Debug {
 
     /// Get this commit's tree identifier (for validating parsed messages).
     fn tree_id(&self) -> Self::Id;
+
+    /// Get the raw bytes of this commit's ID (for origin calculation).
+    /// For SHA1, this should be 20 bytes.
+    fn id_bytes(&self) -> Vec<u8>;
 }
 
 /// Abstract interface for repository operations needed by the algorithm.
@@ -395,15 +399,24 @@ impl<'a, R: RepositoryView> GraphStatsCalculator<'a, R> {
         roots.sort_by_key(|c| c.id());
 
         if roots.len() == 1 {
-            // Single root: use last 2 bytes of its ID
-            // We need to extract bytes from the ID somehow
-            // For now, return a placeholder
-            // TODO: This needs to be implemented properly
-            Some(0x0000)
+            // Single root: use last 2 bytes (16 bits) of its ID
+            let bytes = roots[0].id_bytes();
+            if bytes.len() >= 2 {
+                let last_two = &bytes[bytes.len() - 2..];
+                Some(u16::from_be_bytes([last_two[0], last_two[1]]))
+            } else {
+                Some(0x0000)
+            }
         } else {
-            // Multiple roots: hash them together
-            // TODO: This needs proper implementation
-            Some(0x0000)
+            // Multiple roots: sort their IDs, hash them together, use last 2 bytes
+            use sha1::{Digest, Sha1};
+            let mut hasher = Sha1::new();
+            for root in &roots {
+                hasher.update(root.id_bytes());
+            }
+            let hash = hasher.finalize();
+            // Use last 2 bytes (bytes 18-19 of 20-byte SHA1)
+            Some(u16::from_be_bytes([hash[18], hash[19]]))
         }
     }
 }
